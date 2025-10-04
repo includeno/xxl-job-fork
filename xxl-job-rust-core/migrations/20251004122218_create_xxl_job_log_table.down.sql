@@ -1,0 +1,1 @@
+DROP TABLE xxl_job_log;
