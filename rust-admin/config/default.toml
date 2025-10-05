@@ -1,0 +1,10 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+url = "mysql://root:password@127.0.0.1:3306/xxl_job"
+
+[security]
+# Token 默认有效期（分钟）
+token_ttl_minutes = 1440
