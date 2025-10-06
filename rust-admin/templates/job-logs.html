@@ -281,7 +281,7 @@
 
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
-        window.location.replace("/admin/");
+        window.location.replace("/admin");
     }
 
     const welcomeUser = document.getElementById("welcome-user");
@@ -308,7 +308,7 @@
     logoutBtn.addEventListener("click", () => {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USERNAME_KEY);
-        window.location.replace("/admin/");
+        window.location.replace("/admin");
     });
 
     document.querySelectorAll('[data-modal-close]').forEach((el) => {
