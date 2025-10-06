@@ -1,0 +1,155 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<style>
+    .auth-card {
+        max-width: 420px;
+        padding: 48px 40px 40px;
+        text-align: center;
+    }
+
+    .brand {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+
+    form {
+        display: grid;
+        gap: 18px;
+        margin-top: 28px;
+    }
+
+    label {
+        text-align: left;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+        margin-top: 8px;
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.65);
+        color: inherit;
+        transition: border-color 0.25s ease;
+    }
+
+    input:focus {
+        outline: none;
+        border-color: #38bdf8;
+        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+    }
+
+    button[type="submit"] {
+        padding: 12px;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, #22d3ee, #2563eb);
+        color: #0f172a;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    button[type="submit"]:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 32px rgba(37, 99, 235, 0.3);
+    }
+
+    .helper {
+        font-size: 13px;
+    }
+
+    .alert {
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(248, 113, 113, 0.4);
+        background: rgba(248, 113, 113, 0.12);
+        color: #fecaca;
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card auth-card">
+    <div class="brand">{{ app_name }}</div>
+    <div class="muted">{{ tagline }}</div>
+    <form id="login-form">
+        <div>
+            <label for="username">用户名</label>
+            <input id="username" name="username" type="text" autocomplete="username" required placeholder="admin" />
+        </div>
+        <div>
+            <label for="password">密码</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="请输入密码" />
+        </div>
+        <div id="login-alert" class="alert"></div>
+        <button type="submit">登录</button>
+        <div class="helper muted">
+            登录成功后将颁发访问令牌，保存在浏览器中用于后续 API 请求。
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const TOKEN_KEY = "xxl_admin_token";
+    const USERNAME_KEY = "xxl_admin_username";
+
+    if (localStorage.getItem(TOKEN_KEY)) {
+        window.location.replace("/admin/dashboard");
+    }
+
+    const form = document.getElementById("login-form");
+    const alertBox = document.getElementById("login-alert");
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        alertBox.style.display = "none";
+        const formData = new FormData(form);
+        const payload = {
+            username: formData.get("username")?.trim(),
+            password: formData.get("password")?.trim(),
+        };
+
+        if (!payload.username || !payload.password) {
+            showAlert("请输入用户名和密码");
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ message: "登录失败" }));
+                throw new Error(error.message || "登录失败");
+            }
+
+            const data = await response.json();
+            localStorage.setItem(TOKEN_KEY, data.token);
+            localStorage.setItem(USERNAME_KEY, data.username);
+            window.location.href = "/admin/dashboard";
+        } catch (error) {
+            showAlert(error.message || "登录失败，请稍后重试");
+        }
+    });
+
+    function showAlert(message) {
+        alertBox.textContent = message;
+        alertBox.style.display = "block";
+    }
+</script>
+{% endblock %}
