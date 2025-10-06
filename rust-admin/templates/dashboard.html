@@ -1,0 +1,407 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<style>
+    body {
+        align-items: stretch;
+    }
+
+    .dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 24px 28px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 18px;
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.12);
+    }
+
+    .top-bar h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+        color: rgba(226, 232, 240, 0.8);
+    }
+
+    .summary-grid {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .summary-card {
+        padding: 22px 24px;
+        border-radius: 18px;
+        background: linear-gradient(140deg, rgba(14, 165, 233, 0.18), rgba(37, 99, 235, 0.18));
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .summary-card::after {
+        content: "";
+        position: absolute;
+        inset: -40% -40% auto auto;
+        width: 120px;
+        height: 120px;
+        background: radial-gradient(circle, rgba(56, 189, 248, 0.35), transparent 70%);
+        transform: rotate(45deg);
+    }
+
+    .summary-card span {
+        display: block;
+    }
+
+    .summary-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(226, 232, 240, 0.78);
+    }
+
+    .summary-value {
+        margin-top: 18px;
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+
+    .chart-card {
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: rgba(15, 23, 42, 0.82);
+        padding: 24px 28px;
+    }
+
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .chart-header h2 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .chart-header button {
+        background: rgba(148, 163, 184, 0.15);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        color: inherit;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 13px;
+    }
+
+    .chart-container {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    canvas {
+        width: 100%;
+        height: 240px;
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.65);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 24px;
+    }
+
+    thead {
+        font-size: 13px;
+        color: rgba(226, 232, 240, 0.6);
+    }
+
+    th, td {
+        text-align: left;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .status-dot {
+        display: inline-flex;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        margin-right: 6px;
+    }
+
+    .running { background: #facc15; }
+    .success { background: #22c55e; }
+    .failed { background: #f87171; }
+
+    .toast {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(239, 68, 68, 0.85);
+        color: white;
+        box-shadow: 0 10px 30px rgba(239, 68, 68, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .toast.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    @media (max-width: 768px) {
+        .top-bar {
+            flex-direction: column;
+            gap: 16px;
+            align-items: flex-start;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="top-bar card">
+        <h1>{{ app_name }}</h1>
+        <div class="user-info">
+            <span>当前账号：</span>
+            <span data-username>--</span>
+            <button id="logout-btn" type="button">退出登录</button>
+        </div>
+    </div>
+    <div class="summary-grid">
+        <div class="summary-card card">
+            <span class="summary-label">执行器数量</span>
+            <span class="summary-value" data-summary="group_count">--</span>
+        </div>
+        <div class="summary-card card">
+            <span class="summary-label">任务数量</span>
+            <span class="summary-value" data-summary="job_count">--</span>
+        </div>
+        <div class="summary-card card">
+            <span class="summary-label">日志条目</span>
+            <span class="summary-value" data-summary="log_total_count">--</span>
+        </div>
+        <div class="summary-card card">
+            <span class="summary-label">运行中</span>
+            <span class="summary-value" data-summary="log_running_count">--</span>
+        </div>
+        <div class="summary-card card">
+            <span class="summary-label">成功次数</span>
+            <span class="summary-value" data-summary="log_success_count">--</span>
+        </div>
+        <div class="summary-card card">
+            <span class="summary-label">失败次数</span>
+            <span class="summary-value" data-summary="log_fail_count">--</span>
+        </div>
+    </div>
+    <div class="chart-card card">
+        <div class="chart-header">
+            <h2>近 7 天调度趋势</h2>
+            <button id="refresh-btn" type="button">刷新数据</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="chart" width="960" height="280"></canvas>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>日期</th>
+                <th><span class="status-dot running"></span>运行</th>
+                <th><span class="status-dot success"></span>成功</th>
+                <th><span class="status-dot failed"></span>失败</th>
+            </tr>
+            </thead>
+            <tbody id="chart-table">
+            <tr>
+                <td colspan="4" class="muted">加载中...</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const TOKEN_KEY = "xxl_admin_token";
+    const USERNAME_KEY = "xxl_admin_username";
+    const SUMMARY_ENDPOINT = "{{ summary_endpoint }}";
+    const CHART_ENDPOINT = "{{ chart_endpoint }}";
+
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+        window.location.replace("/admin");
+    }
+
+    const usernameEl = document.querySelector('[data-username]');
+    usernameEl.textContent = localStorage.getItem(USERNAME_KEY) || "未登录";
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USERNAME_KEY);
+        window.location.href = '/admin';
+    });
+
+    const summaryFields = document.querySelectorAll('[data-summary]');
+    const chartTable = document.getElementById('chart-table');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const toast = document.getElementById('toast');
+
+    refreshBtn.addEventListener('click', () => {
+        loadDashboard();
+    });
+
+    async function loadDashboard() {
+        try {
+            const [summary, chart] = await Promise.all([
+                fetchJson(SUMMARY_ENDPOINT),
+                fetchJson(CHART_ENDPOINT),
+            ]);
+            renderSummary(summary);
+            renderChart(chart);
+            renderTable(chart);
+        } catch (error) {
+            showToast(error.message || '加载数据失败');
+        }
+    }
+
+    async function fetchJson(url) {
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem(USERNAME_KEY);
+                window.location.href = '/admin';
+                return Promise.reject(new Error('未认证'));
+            }
+            const error = await response.json().catch(() => ({ message: '请求失败' }));
+            throw new Error(error.message || '请求失败');
+        }
+        return response.json();
+    }
+
+    function renderSummary(summary) {
+        summaryFields.forEach((field) => {
+            const key = field.getAttribute('data-summary');
+            const value = summary[key];
+            field.textContent = typeof value === 'number' ? value.toLocaleString() : '--';
+        });
+    }
+
+    function renderChart(points) {
+        const canvas = document.getElementById('chart');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        const padding = 36;
+        const axisY = height - padding;
+        const axisX = padding;
+        const chartWidth = width - padding * 2;
+        const chartHeight = height - padding * 2;
+
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(axisX, padding);
+        ctx.lineTo(axisX, axisY);
+        ctx.lineTo(width - padding, axisY);
+        ctx.stroke();
+
+        if (!points.length) {
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+            ctx.fillText('暂无数据', width / 2 - 28, height / 2);
+            return;
+        }
+
+        const maxValue = Math.max(...points.map((p) => Math.max(p.running_count, p.suc_count, p.fail_count))) || 1;
+        const stepX = chartWidth / Math.max(points.length - 1, 1);
+
+        const colors = {
+            running_count: '#facc15',
+            suc_count: '#22c55e',
+            fail_count: '#f87171',
+        };
+
+        const metrics = Object.keys(colors);
+
+        metrics.forEach((metric) => {
+            ctx.beginPath();
+            ctx.strokeStyle = colors[metric];
+            ctx.lineWidth = 2;
+            points.forEach((point, index) => {
+                const x = axisX + stepX * index;
+                const yRatio = point[metric] / maxValue;
+                const y = axisY - yRatio * chartHeight;
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+        });
+
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+        ctx.font = '12px "Inter", sans-serif';
+        points.forEach((point, index) => {
+            const x = axisX + stepX * index;
+            ctx.fillText(point.trigger_day, x - 24, height - 8);
+        });
+    }
+
+    function renderTable(points) {
+        if (!points.length) {
+            chartTable.innerHTML = '<tr><td colspan="4" class="muted">暂无数据</td></tr>';
+            return;
+        }
+        chartTable.innerHTML = points
+            .map((point) => `
+                <tr>
+                    <td>${point.trigger_day}</td>
+                    <td>${point.running_count.toLocaleString()}</td>
+                    <td>${point.suc_count.toLocaleString()}</td>
+                    <td>${point.fail_count.toLocaleString()}</td>
+                </tr>
+            `)
+            .join('');
+    }
+
+    function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3200);
+    }
+
+    loadDashboard();
+</script>
+{% endblock %}

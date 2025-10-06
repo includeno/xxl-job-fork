@@ -4,6 +4,7 @@ mod entities;
 mod error;
 mod routes;
 mod state;
+mod templates;
 
 use std::net::SocketAddr;
 

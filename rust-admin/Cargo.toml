@@ -30,3 +30,4 @@ cron = "0.12"
 strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
 anyhow = "1"
+askama = "0.12"
