@@ -8,3 +8,9 @@ url = "mysql://root:password@127.0.0.1:3306/xxl_job"
 [security]
 # Token 默认有效期（分钟）
 token_ttl_minutes = 1440
+
+[executor]
+# 与执行器通信的 Access Token，需要与执行器配置保持一致
+access_token = "default_token"
+# 调度触发请求的超时时间（秒）
+timeout_seconds = 3

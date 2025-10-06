@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use anyhow::{anyhow, Context};
 use serde::Deserialize;
@@ -11,6 +11,8 @@ pub struct Settings {
     pub database: DatabaseSettings,
     #[serde(default)]
     pub spring: SpringSettings,
+    #[serde(default)]
+    pub executor: ExecutorSettings,
     pub security: SecuritySettings,
 }
 
@@ -120,6 +122,31 @@ pub struct DatabaseSettings {
 #[derive(Debug, Clone, Deserialize)]
 pub struct SecuritySettings {
     pub token_ttl_minutes: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ExecutorSettings {
+    pub access_token: Option<String>,
+    #[serde(default)]
+    pub timeout_seconds: Option<u64>,
+}
+
+impl ExecutorSettings {
+    pub fn access_token(&self) -> Option<&str> {
+        self.access_token
+            .as_deref()
+            .map(|token| token.trim())
+            .filter(|token| !token.is_empty())
+    }
+
+    pub fn timeout_seconds(&self) -> u64 {
+        let raw = self.timeout_seconds.unwrap_or(3);
+        raw.clamp(1, 10)
+    }
+
+    pub fn timeout(&self) -> Duration {
+        Duration::from_secs(self.timeout_seconds())
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

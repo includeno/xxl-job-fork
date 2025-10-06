@@ -26,8 +26,11 @@ async fn main() -> anyhow::Result<()> {
     let addr: SocketAddr = settings.server.socket_addr()?;
     let database_url = settings.database_url()?;
     let db = Database::connect(&database_url).await?;
+    let http_client = reqwest::Client::builder()
+        .timeout(settings.executor.timeout())
+        .build()?;
 
-    let state = AppState::new(db, settings);
+    let state = AppState::new(db, settings, http_client);
     let app = routes::create_router(state);
 
     let listener = TcpListener::bind(addr).await?;

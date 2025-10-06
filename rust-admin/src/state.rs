@@ -12,12 +12,17 @@ pub struct AppState {
 struct AppStateInner {
     pub db: DatabaseConnection,
     pub settings: Settings,
+    pub http_client: reqwest::Client,
 }
 
 impl AppState {
-    pub fn new(db: DatabaseConnection, settings: Settings) -> Self {
+    pub fn new(db: DatabaseConnection, settings: Settings, http_client: reqwest::Client) -> Self {
         Self {
-            inner: Arc::new(AppStateInner { db, settings }),
+            inner: Arc::new(AppStateInner {
+                db,
+                settings,
+                http_client,
+            }),
         }
     }
 
@@ -27,5 +32,9 @@ impl AppState {
 
     pub fn settings(&self) -> &Settings {
         &self.inner.settings
+    }
+
+    pub fn http_client(&self) -> &reqwest::Client {
+        &self.inner.http_client
     }
 }
