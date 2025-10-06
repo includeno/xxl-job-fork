@@ -385,10 +385,8 @@ async fn trigger_job(
     debug!(job_id = job.id, addresses = %addresses.join(","), "执行器地址详情");
 
     let now = Local::now();
-    let executor_param = payload
-        .executor_param
-        .clone()
-        .or(job.executor_param.clone());
+    let executor_param = normalize_optional_payload_string(payload.executor_param.clone())
+        .or_else(|| job.executor_param.clone());
 
     debug!(
         job_id = job.id,
@@ -591,6 +589,19 @@ fn build_trigger_param(
         broadcast_index: 0,
         broadcast_total: 1,
     }
+}
+
+fn normalize_optional_payload_string(value: Option<String>) -> Option<String> {
+    value.and_then(|raw| {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            None
+        } else if trimmed.len() == raw.len() {
+            Some(raw)
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
 }
 
 fn timestamp_millis_from_naive_local(dt: chrono::NaiveDateTime) -> i64 {
