@@ -1,5 +1,5 @@
 use axum::{extract::State, routing::get, Json, Router};
-use chrono::{Duration, NaiveDateTime, NaiveTime, Utc};
+use chrono::{Duration, Local, NaiveDateTime, NaiveTime};
 use sea_orm::{query::*, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
 
@@ -63,7 +63,7 @@ struct ChartPoint {
 }
 
 async fn chart(State(state): State<AppState>, _user: AuthUser) -> AppResult<Json<Vec<ChartPoint>>> {
-    let today = Utc::now().date_naive();
+    let today = Local::now().date_naive();
     let start_day = today - Duration::days(7);
 
     let rows = job_log_report::Entity::find()

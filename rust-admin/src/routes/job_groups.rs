@@ -3,7 +3,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::Utc;
+use chrono::Local;
 use sea_orm::{query::*, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -135,7 +135,7 @@ async fn create(
 
     let address_list = validate_address_list(&state, &payload).await?;
 
-    let now = Utc::now().naive_utc();
+    let now = Local::now().naive_local();
     let active = job_group::ActiveModel {
         app_name: Set(payload.appname.trim().to_string()),
         title: Set(payload.title.trim().to_string()),
@@ -181,7 +181,7 @@ async fn update(
     model.title = payload.title.trim().to_string();
     model.address_type = payload.address_type;
     model.address_list = address_list;
-    model.update_time = Some(Utc::now().naive_utc());
+    model.update_time = Some(Local::now().naive_local());
 
     let active: job_group::ActiveModel = model.into();
     let updated = active.update(state.db()).await?;
