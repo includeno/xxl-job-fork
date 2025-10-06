@@ -70,6 +70,7 @@ async fn save_registry(state: &AppState, payload: RegistryRequest) -> Result<(),
     let existing = job_registry::Entity::find()
         .filter(job_registry::Column::RegistryGroup.eq(group))
         .filter(job_registry::Column::RegistryKey.eq(key))
+        .filter(job_registry::Column::RegistryValue.eq(value))
         .one(state.db())
         .await
         .map_err(|err| {
@@ -78,7 +79,6 @@ async fn save_registry(state: &AppState, payload: RegistryRequest) -> Result<(),
         })?;
 
     if let Some(mut model) = existing {
-        model.registry_value = value.to_string();
         model.update_time = Some(now);
         let active: job_registry::ActiveModel = model.into();
         active.update(state.db()).await.map_err(|err| {

@@ -18,6 +18,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use tracing::{debug, error, info, warn};
 
+const REGISTRY_DEAD_TIMEOUT_SECONDS: i64 = 90;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(page_list).post(create))
@@ -609,7 +611,15 @@ async fn trigger_executor(
         request = request.header("XXL-JOB-ACCESS-TOKEN", token);
     }
 
-    let response = request.send().await?;
+    let response = request.send().await.map_err(|err| {
+        if err.is_connect() {
+            anyhow::anyhow!("无法连接到执行器，请确认网络和端口是否可达: {err}")
+        } else if err.is_timeout() {
+            anyhow::anyhow!("请求执行器超时，请检查执行器负载或网络状况: {err}")
+        } else {
+            anyhow::anyhow!("调用执行器发生错误: {err}")
+        }
+    })?;
     debug!(executor_address = raw_address, status = %response.status(), "收到执行器响应");
     if !response.status().is_success() {
         return Err(anyhow::anyhow!(
@@ -667,6 +677,11 @@ async fn resolve_executor_addresses(
         app_name = group.app_name.as_str(),
         "从注册中心查询执行器地址"
     );
+    let cutoff = Utc::now()
+        .checked_sub_signed(Duration::seconds(REGISTRY_DEAD_TIMEOUT_SECONDS))
+        .unwrap_or_else(Utc::now)
+        .naive_utc();
+
     let registries = job_registry::Entity::find()
         .filter(job_registry::Column::RegistryGroup.eq("EXECUTOR"))
         .filter(job_registry::Column::RegistryKey.eq(group.app_name.as_str()))
@@ -674,24 +689,39 @@ async fn resolve_executor_addresses(
         .await?;
 
     let mut list: Vec<String> = Vec::new();
+    let mut skipped = 0usize;
     for item in registries {
-        if let Some(address) = normalize_executor_address(&item.registry_value) {
-            if !list.contains(&address) {
-                list.push(address);
+        if item.update_time.map(|t| t >= cutoff).unwrap_or(false) {
+            if let Some(address) = normalize_executor_address(&item.registry_value) {
+                if !list.contains(&address) {
+                    list.push(address);
+                }
             }
+        } else {
+            skipped += 1;
         }
+    }
+
+    if skipped > 0 {
+        warn!(
+            job_group = group.id,
+            skipped,
+            cutoff = cutoff.to_string(),
+            "剔除超过心跳超时时间的执行器实例"
+        );
     }
 
     if list.is_empty() {
         error!(job_group = group.id, "未检测到可用执行器实例");
         return Err(AppError::BadRequest(
-            "未检测到可用的执行器实例，请确认执行器是否注册成功".into(),
+            "未检测到可用的执行器实例，请确认执行器是否注册成功并保持心跳".into(),
         ));
     }
 
     info!(
         job_group = group.id,
         address_count = list.len(),
+        stale_skipped = skipped,
         "成功解析执行器地址"
     );
     Ok(list)
