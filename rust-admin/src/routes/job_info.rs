@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{Duration, Local, LocalResult, TimeZone, Utc};
 use cron::Schedule;
 use sea_orm::{query::*, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -189,7 +189,7 @@ async fn create(
 
     ensure_group_exists(&state, payload.job_group).await?;
 
-    let now = Utc::now().naive_utc();
+    let now = Local::now().naive_local();
     let active = job_info::ActiveModel {
         job_group: Set(payload.job_group),
         job_desc: Set(payload.job_desc.clone()),
@@ -259,7 +259,7 @@ async fn update(
     model.glue_source = payload.glue_source.clone();
     model.glue_remark = payload.glue_remark.clone();
     model.child_jobid = payload.child_jobid.clone();
-    model.update_time = Some(Utc::now().naive_utc());
+    model.update_time = Some(Local::now().naive_local());
 
     let active: job_info::ActiveModel = model.into();
     let updated = active.update(state.db()).await?;
@@ -322,7 +322,7 @@ async fn stop_job(
     Ok(Json(JobInfoDto::from(updated)))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TriggerRequest {
     executor_param: Option<String>,
@@ -337,7 +337,18 @@ async fn trigger_job(
 ) -> AppResult<Json<serde_json::Value>> {
     user.require_admin()?;
 
-    info!(job_id = id, "开始处理手动触发请求");
+    let request_body = match serde_json::to_string(&payload) {
+        Ok(body) => body,
+        Err(err) => {
+            warn!(job_id = id, error = %err, "序列化手动触发请求体失败，使用 Debug 输出");
+            format!("{:?}", payload)
+        }
+    };
+    info!(
+        job_id = id,
+        request_body = %request_body,
+        "开始处理手动触发请求"
+    );
 
     let mut job = job_info::Entity::find_by_id(id)
         .one(state.db())
@@ -373,7 +384,7 @@ async fn trigger_job(
     );
     debug!(job_id = job.id, addresses = %addresses.join(","), "执行器地址详情");
 
-    let now = Utc::now();
+    let now = Local::now();
     let executor_param = payload
         .executor_param
         .clone()
@@ -397,7 +408,7 @@ async fn trigger_job(
         executor_param: Set(executor_param.clone()),
         executor_sharding_param: Set(None),
         executor_fail_retry_count: Set(job.executor_fail_retry_count),
-        trigger_time: Set(Some(now.naive_utc())),
+        trigger_time: Set(Some(now.naive_local())),
         trigger_code: Set(0),
         trigger_msg: Set(None),
         handle_time: Set(None),
@@ -563,7 +574,7 @@ fn build_trigger_param(
     let glue_source = job.glue_source.clone().unwrap_or_default();
     let glue_updatetime = job
         .glue_updatetime
-        .map(|dt| Utc.from_utc_datetime(&dt).timestamp_millis())
+        .map(timestamp_millis_from_naive_local)
         .unwrap_or_default();
 
     TriggerParamPayload {
@@ -579,6 +590,16 @@ fn build_trigger_param(
         glue_updatetime,
         broadcast_index: 0,
         broadcast_total: 1,
+    }
+}
+
+fn timestamp_millis_from_naive_local(dt: chrono::NaiveDateTime) -> i64 {
+    match Local.from_local_datetime(&dt) {
+        LocalResult::Single(value) => value.timestamp_millis(),
+        LocalResult::Ambiguous(first, second) => {
+            first.timestamp_millis().min(second.timestamp_millis())
+        }
+        LocalResult::None => Utc.from_utc_datetime(&dt).timestamp_millis(),
     }
 }
 
@@ -601,9 +622,21 @@ async fn trigger_executor(
     }
     address.push_str("run");
 
-    debug!(
+    let request_body = match serde_json::to_string(payload) {
+        Ok(body) => body,
+        Err(err) => {
+            warn!(
+                executor_address = raw_address,
+                error = %err,
+                "序列化执行器触发请求体失败，使用 Debug 输出"
+            );
+            format!("{:?}", payload)
+        }
+    };
+    info!(
         executor_address = raw_address,
-        url = address,
+        url = address.as_str(),
+        request_body = %request_body,
         "发送执行器触发请求"
     );
 
@@ -678,10 +711,10 @@ async fn resolve_executor_addresses(
         app_name = group.app_name.as_str(),
         "从注册中心查询执行器地址"
     );
-    let cutoff = Utc::now()
+    let cutoff = Local::now()
         .checked_sub_signed(Duration::seconds(REGISTRY_DEAD_TIMEOUT_SECONDS))
-        .unwrap_or_else(Utc::now)
-        .naive_utc();
+        .unwrap_or_else(Local::now)
+        .naive_local();
 
     let registries = job_registry::Entity::find()
         .filter(job_registry::Column::RegistryGroup.eq("EXECUTOR"))
@@ -710,10 +743,7 @@ async fn resolve_executor_addresses(
     }
 
     if !stale.is_empty() {
-        let last_seen = stale
-            .iter()
-            .filter_map(|(_, ts)| *ts)
-            .max();
+        let last_seen = stale.iter().filter_map(|(_, ts)| *ts).max();
         warn!(
             job_group = group.id,
             skipped = stale.len(),
