@@ -17,133 +17,6 @@
 
 {% block head %}
 <style>
-    :root {
-        --border-color: #e2e8f0;
-        --muted: #64748b;
-        --primary: #2563eb;
-        --primary-hover: #1d4ed8;
-        --surface: #ffffff;
-        --surface-muted: #f8fafc;
-        --warning: #f59e0b;
-        --success: #16a34a;
-    }
-
-    .sidebar {
-        width: 220px;
-        padding: 20px 18px;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        background: var(--surface);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-    }
-
-    .sidebar-header {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .sidebar-title {
-        font-size: 18px;
-        font-weight: 600;
-        color: #0f172a;
-        letter-spacing: 0.02em;
-    }
-
-    .sidebar-subtitle {
-        font-size: 13px;
-        color: var(--muted);
-    }
-
-    .sidebar-nav {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .nav-link {
-        display: flex;
-        align-items: center;
-        padding: 10px 12px;
-        border-radius: 8px;
-        text-decoration: none;
-        color: #0f172a;
-        font-weight: 500;
-        transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .nav-link:hover {
-        background: var(--surface-muted);
-        color: var(--primary);
-    }
-
-    .nav-link.is-active {
-        background: var(--primary);
-        color: #ffffff;
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.18);
-    }
-
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px 24px;
-        border-radius: 12px;
-        border: 1px solid var(--border-color);
-        background: var(--surface);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
-        margin-bottom: 12px;
-    }
-
-    .page-header h1 {
-        margin: 0;
-        font-size: 20px;
-        color: #0f172a;
-    }
-
-    .page-header .muted {
-        margin-top: 4px;
-        color: var(--muted);
-        font-size: 13px;
-    }
-
-    .user-info {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-size: 14px;
-        color: #0f172a;
-    }
-
-    .user-info button {
-        border: 1px solid var(--border-color);
-        background: #ffffff;
-        color: #334155;
-        padding: 6px 12px;
-        border-radius: 8px;
-        transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-    }
-
-    .user-info button:hover {
-        border-color: var(--primary);
-        color: var(--primary);
-        background: var(--surface-muted);
-    }
-
-    .section-card {
-        padding: 20px 24px;
-        border-radius: 12px;
-        border: 1px solid var(--border-color);
-        background: var(--surface);
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-    }
-
     .section-header {
         display: flex;
         justify-content: space-between;
@@ -167,71 +40,6 @@
         gap: 12px;
     }
 
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 8px 16px;
-        font-size: 14px;
-        border-radius: 8px;
-        border: 1px solid transparent;
-        background: #ffffff;
-        color: #1f2937;
-        transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .btn:hover {
-        background: var(--surface-muted);
-        border-color: var(--border-color);
-    }
-
-    .btn-primary {
-        background: var(--primary);
-        border-color: var(--primary);
-        color: #ffffff;
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
-    }
-
-    .btn-primary:hover {
-        background: var(--primary-hover);
-        border-color: var(--primary-hover);
-    }
-
-    .btn-secondary {
-        border-color: var(--border-color);
-    }
-
-    .btn-secondary:hover {
-        border-color: var(--primary);
-        color: var(--primary);
-    }
-
-    .btn-ghost {
-        background: transparent;
-        border-color: transparent;
-        color: #1f2937;
-        padding: 4px 10px;
-        font-size: 13px;
-    }
-
-    .btn-ghost:hover {
-        background: var(--surface-muted);
-        color: var(--primary);
-    }
-
-    .btn-danger {
-        background: #fee2e2;
-        border-color: #fecaca;
-        color: #b91c1c;
-    }
-
-    .btn-danger:hover {
-        background: #fecaca;
-        border-color: #fca5a5;
-        color: #991b1b;
-    }
-
     .filter-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -252,57 +60,6 @@
         gap: 12px;
     }
 
-    .filter-grid input,
-    .filter-grid select,
-    .modal-body input,
-    .modal-body textarea,
-    .modal-body select {
-        padding: 10px 12px;
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        background: #ffffff;
-        color: #0f172a;
-        font: inherit;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .filter-grid input:focus,
-    .filter-grid select:focus,
-    .modal-body input:focus,
-    .modal-body textarea:focus,
-    .modal-body select:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-        outline: none;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    th {
-        text-align: left;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--border-color);
-        font-weight: 600;
-        font-size: 13px;
-        color: #475569;
-    }
-
-    td {
-        text-align: left;
-        padding: 12px 0;
-        border-bottom: 1px solid #f1f5f9;
-        vertical-align: middle;
-        color: #0f172a;
-        font-size: 14px;
-    }
-
-    tbody tr:hover {
-        background: var(--surface-muted);
-    }
-
     .status-badge {
         display: inline-flex;
         align-items: center;
@@ -320,8 +77,8 @@
     }
 
     .status-badge[data-status="stopped"] {
-        background: #fee2e2;
-        color: #b91c1c;
+        background: var(--danger-soft);
+        color: var(--danger);
     }
 
     .table-actions {
@@ -330,103 +87,19 @@
         flex-wrap: wrap;
     }
 
-    .table-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 13px;
-        color: var(--muted);
+    .table-actions .btn {
+        padding: 6px 12px;
     }
 
-    .pager {
-        display: inline-flex;
-        gap: 8px;
-    }
-
-    .pager button {
-        min-width: 88px;
-    }
-
-    .pager button[disabled] {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .modal {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 999;
-    }
-
-    .modal.hidden {
-        display: none;
-    }
-
-    .modal-backdrop {
-        position: absolute;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.45);
-        backdrop-filter: blur(2px);
-    }
-
-    .modal-content {
-        position: relative;
-        width: min(900px, 94vw);
-        max-height: 90vh;
-        overflow-y: auto;
-        padding: 24px 28px;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        background: var(--surface);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
-    }
-
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .modal-header h3 {
-        margin: 0;
-        font-size: 18px;
-        color: #0f172a;
-    }
-
-    .modal-close {
+    .btn-ghost {
         background: transparent;
-        border: none;
-        color: #94a3b8;
-        font-size: 24px;
-        line-height: 1;
-        cursor: pointer;
-        transition: color 0.2s ease;
+        border-color: transparent;
+        color: var(--primary);
     }
 
-    .modal-close:hover {
-        color: #334155;
-    }
-
-    .modal-body {
-        display: grid;
-        gap: 18px;
-    }
-
-    .form-grid {
-        display: grid;
-        gap: 12px 16px;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    }
-
-    .form-grid textarea {
-        min-height: 80px;
-        resize: vertical;
+    .btn-ghost:hover {
+        background: var(--surface-muted);
+        color: var(--primary);
     }
 
     .trigger-preview {
@@ -436,57 +109,60 @@
         color: #475569;
     }
 
-    .modal-footer {
+    .form-section {
         display: flex;
-        justify-content: flex-end;
-        gap: 12px;
+        flex-direction: column;
+        gap: 16px;
+        padding: 20px 22px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: var(--surface-muted);
     }
 
-    .toast {
-        position: fixed;
-        top: 24px;
-        right: 24px;
-        padding: 12px 16px;
-        border-radius: 10px;
-        background: var(--primary);
-        color: #ffffff;
-        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.25);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.3s ease;
-        z-index: 1200;
+    .form-section h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #0f172a;
     }
 
-    .toast.error {
-        background: #ef4444;
-        box-shadow: 0 10px 30px rgba(239, 68, 68, 0.25);
+    .form-grid {
+        display: grid;
+        gap: 12px 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
 
-    .toast.show {
-        opacity: 1;
-        pointer-events: auto;
+    .form-grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 13px;
+        color: #475569;
     }
 
-    @media (max-width: 1024px) {
-        .page-layout {
+    .form-grid textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+
+    .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .modal-body.form-grid {
+        display: grid;
+    }
+
+    @media (max-width: 768px) {
+        .section-actions {
             flex-direction: column;
-        }
-
-        .sidebar {
             width: 100%;
-            flex-direction: row;
-            align-items: stretch;
-            gap: 16px;
         }
 
-        .sidebar-nav {
-            flex-direction: row;
-            flex-wrap: wrap;
-        }
-
-        .nav-link {
-            flex: 1 1 140px;
-            justify-content: center;
+        .section-actions .btn {
+            width: 100%;
         }
     }
 </style>
@@ -504,15 +180,11 @@
     </div>
 </div>
 
-<section class="section-card card">
+<section class="card section">
     <div class="section-header">
         <div>
-            <h2>任务列表</h2>
-            <div class="muted">查看任务状态并执行操作</div>
-        </div>
-        <div class="section-actions">
-            <button id="open-job-modal" type="button" class="btn btn-primary">新增任务</button>
-            <button id="reload-jobs" type="button" class="btn btn-secondary">刷新</button>
+            <h2>筛选条件</h2>
+            <div class="muted">按执行器、负责人等条件快速定位任务</div>
         </div>
     </div>
     <form id="job-filter-form" class="filter-grid">
@@ -545,7 +217,20 @@
             <button type="button" id="job-reset" class="btn btn-secondary">重置</button>
         </div>
     </form>
-    <table>
+</section>
+
+<section class="card section">
+    <div class="section-header">
+        <div>
+            <h2>任务列表</h2>
+            <div class="muted">查看任务状态并执行操作</div>
+        </div>
+        <div class="section-actions">
+            <button id="open-job-modal" type="button" class="btn btn-primary">新增任务</button>
+            <button id="reload-jobs" type="button" class="btn btn-secondary">刷新</button>
+        </div>
+    </div>
+    <table class="table">
         <thead>
             <tr>
                 <th>ID</th>
@@ -582,107 +267,125 @@
         </div>
         <form id="job-form">
             <div class="modal-body">
-                <div class="form-grid">
-                    <label>
-                        执行器
-                        <select id="job-group" name="job_group" required></select>
-                    </label>
-                    <label>
-                        任务描述
-                        <input id="job-desc" name="job_desc" type="text" required />
-                    </label>
-                    <label>
-                        负责人
-                        <input id="job-author" name="author" type="text" placeholder="可选" />
-                    </label>
-                    <label>
-                        报警邮箱
-                        <input id="job-email" name="alarm_email" type="email" placeholder="多个以逗号分隔" />
-                    </label>
-                    <label>
-                        调度类型
-                        <select id="job-schedule-type" name="schedule_type">
-                            <option value="CRON">CRON</option>
-                            <option value="FIX_RATE">固定频率 (秒)</option>
-                            <option value="FIX_DELAY">固定延迟 (秒)</option>
-                            <option value="NONE">手动触发</option>
-                        </select>
-                    </label>
-                    <label>
-                        调度配置
-                        <input id="job-schedule-conf" name="schedule_conf" type="text" placeholder="CRON 表达式或秒数" />
-                    </label>
-                    <label>
-                        错过策略
-                        <select id="job-misfire" name="misfire_strategy">
-                            <option value="DO_NOTHING">忽略</option>
-                            <option value="FIRE_ONCE_NOW">立即执行一次</option>
-                        </select>
-                    </label>
-                    <label>
-                        路由策略
-                        <select id="job-route" name="executor_route_strategy">
-                            <option value="FIRST">第一个</option>
-                            <option value="LAST">最后一个</option>
-                            <option value="ROUND">轮询</option>
-                            <option value="RANDOM">随机</option>
-                            <option value="CONSISTENT_HASH">一致性 HASH</option>
-                            <option value="LEAST_FREQUENTLY_USED">最不经常使用</option>
-                            <option value="LEAST_RECENTLY_USED">最近最久未使用</option>
-                            <option value="FAILOVER">故障转移</option>
-                            <option value="BUSYOVER">忙碌转移</option>
-                            <option value="SHARDING_BROADCAST">分片广播</option>
-                        </select>
-                    </label>
-                    <label>
-                        阻塞策略
-                        <select id="job-block" name="executor_block_strategy">
-                            <option value="SERIAL_EXECUTION">单机串行</option>
-                            <option value="DISCARD_LATER">丢弃后续</option>
-                            <option value="COVER_EARLY">覆盖之前</option>
-                        </select>
-                    </label>
-                    <label>
-                        Handler
-                        <input id="job-handler" name="executor_handler" type="text" placeholder="示例：demoJobHandler" />
-                    </label>
-                    <label>
-                        任务参数
-                        <textarea id="job-param" name="executor_param" placeholder="JSON 或文本"></textarea>
-                    </label>
-                    <label>
-                        超时时间 (秒)
-                        <input id="job-timeout" name="executor_timeout" type="number" min="0" value="0" />
-                    </label>
-                    <label>
-                        失败重试次数
-                        <input id="job-retry" name="executor_fail_retry_count" type="number" min="0" value="0" />
-                    </label>
-                    <label>
-                        Glue 类型
-                        <select id="job-glue" name="glue_type">
-                            <option value="BEAN">BEAN</option>
-                            <option value="GLUE_GROOVY">GLUE Groovy</option>
-                            <option value="GLUE_SHELL">GLUE Shell</option>
-                            <option value="GLUE_PYTHON">GLUE Python</option>
-                            <option value="GLUE_PHP">GLUE PHP</option>
-                            <option value="GLUE_NODEJS">GLUE Nodejs</option>
-                            <option value="GLUE_POWERSHELL">GLUE PowerShell</option>
-                        </select>
-                    </label>
-                    <label>
-                        Glue 备注
-                        <input id="job-glue-remark" name="glue_remark" type="text" placeholder="可选" />
-                    </label>
-                    <label>
-                        子任务 ID
-                        <input id="job-child" name="child_jobid" type="text" placeholder="多个以逗号分隔" />
-                    </label>
-                </div>
-                <div class="trigger-preview">
-                    <button type="button" id="preview-trigger" class="btn btn-secondary">预览最近执行时间</button>
-                    <div id="trigger-preview-list" class="muted" style="font-size: 13px;">--</div>
-                </div>
+                <section class="form-section">
+                    <h4>基础信息</h4>
+                    <div class="form-grid">
+                        <label>
+                            执行器
+                            <select id="job-group" name="job_group" required></select>
+                        </label>
+                        <label>
+                            任务描述
+                            <input id="job-desc" name="job_desc" type="text" required />
+                        </label>
+                        <label>
+                            负责人
+                            <input id="job-author" name="author" type="text" placeholder="可选" />
+                        </label>
+                        <label>
+                            报警邮箱
+                            <input id="job-email" name="alarm_email" type="email" placeholder="多个以逗号分隔" />
+                        </label>
+                    </div>
+                </section>
+                <section class="form-section">
+                    <h4>调度配置</h4>
+                    <div class="form-grid">
+                        <label>
+                            调度类型
+                            <select id="job-schedule-type" name="schedule_type">
+                                <option value="CRON">CRON</option>
+                                <option value="FIX_RATE">固定频率 (秒)</option>
+                                <option value="FIX_DELAY">固定延迟 (秒)</option>
+                                <option value="NONE">手动触发</option>
+                            </select>
+                        </label>
+                        <label>
+                            调度配置
+                            <input id="job-schedule-conf" name="schedule_conf" type="text" placeholder="CRON 表达式或秒数" />
+                        </label>
+                        <label>
+                            错过策略
+                            <select id="job-misfire" name="misfire_strategy">
+                                <option value="DO_NOTHING">忽略</option>
+                                <option value="FIRE_ONCE_NOW">立即执行一次</option>
+                            </select>
+                        </label>
+                        <label>
+                            路由策略
+                            <select id="job-route" name="executor_route_strategy">
+                                <option value="FIRST">第一个</option>
+                                <option value="LAST">最后一个</option>
+                                <option value="ROUND">轮询</option>
+                                <option value="RANDOM">随机</option>
+                                <option value="CONSISTENT_HASH">一致性 HASH</option>
+                                <option value="LEAST_FREQUENTLY_USED">最不经常使用</option>
+                                <option value="LEAST_RECENTLY_USED">最近最久未使用</option>
+                                <option value="FAILOVER">故障转移</option>
+                                <option value="BUSYOVER">忙碌转移</option>
+                                <option value="SHARDING_BROADCAST">分片广播</option>
+                            </select>
+                        </label>
+                        <label>
+                            阻塞策略
+                            <select id="job-block" name="executor_block_strategy">
+                                <option value="SERIAL_EXECUTION">单机串行</option>
+                                <option value="DISCARD_LATER">丢弃后续</option>
+                                <option value="COVER_EARLY">覆盖之前</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="trigger-preview">
+                        <button type="button" id="preview-trigger" class="btn btn-secondary">预览最近执行时间</button>
+                        <div id="trigger-preview-list" class="muted" style="font-size: 13px;">--</div>
+                    </div>
+                </section>
+                <section class="form-section">
+                    <h4>执行设置</h4>
+                    <div class="form-grid">
+                        <label>
+                            Handler
+                            <input id="job-handler" name="executor_handler" type="text" placeholder="示例：demoJobHandler" />
+                        </label>
+                        <label>
+                            任务参数
+                            <textarea id="job-param" name="executor_param" placeholder="JSON 或文本"></textarea>
+                        </label>
+                        <label>
+                            超时时间 (秒)
+                            <input id="job-timeout" name="executor_timeout" type="number" min="0" value="0" />
+                        </label>
+                        <label>
+                            失败重试次数
+                            <input id="job-retry" name="executor_fail_retry_count" type="number" min="0" value="0" />
+                        </label>
+                        <label>
+                            子任务 ID
+                            <input id="job-child" name="child_jobid" type="text" placeholder="多个以逗号分隔" />
+                        </label>
+                    </div>
+                </section>
+                <section class="form-section">
+                    <h4>GLUE 配置</h4>
+                    <div class="form-grid">
+                        <label>
+                            Glue 类型
+                            <select id="job-glue" name="glue_type">
+                                <option value="BEAN">BEAN</option>
+                                <option value="GLUE_GROOVY">GLUE Groovy</option>
+                                <option value="GLUE_SHELL">GLUE Shell</option>
+                                <option value="GLUE_PYTHON">GLUE Python</option>
+                                <option value="GLUE_PHP">GLUE PHP</option>
+                                <option value="GLUE_NODEJS">GLUE Nodejs</option>
+                                <option value="GLUE_POWERSHELL">GLUE PowerShell</option>
+                            </select>
+                        </label>
+                        <label>
+                            Glue 备注
+                            <input id="job-glue-remark" name="glue_remark" type="text" placeholder="可选" />
+                        </label>
+                    </div>
+                </section>
             </div>
             <div class="modal-footer">
                 <button type="button" data-modal-close class="btn btn-secondary">取消</button>
