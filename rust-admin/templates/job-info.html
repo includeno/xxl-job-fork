@@ -1,0 +1,1106 @@
+{% extends "layout.html" %}
+
+{% block sidebar %}
+<aside class="sidebar card">
+    <div class="sidebar-header">
+        <div class="sidebar-title">{{ app_name }}</div>
+        <div class="sidebar-subtitle muted">分布式任务调度中心</div>
+    </div>
+    <nav class="sidebar-nav">
+        <a class="nav-link" href="/admin/dashboard">仪表盘</a>
+        <a class="nav-link{% if active_nav == "jobs" %} is-active{% endif %}" href="/admin/jobs">任务管理</a>
+        <a class="nav-link" href="/admin/groups">执行器管理</a>
+        <a class="nav-link" href="/admin/logs">任务日志</a>
+    </nav>
+</aside>
+{% endblock %}
+
+{% block head %}
+<style>
+    :root {
+        --border-color: rgba(148, 163, 184, 0.18);
+        --muted: rgba(226, 232, 240, 0.75);
+        --warning: #facc15;
+        --success: #22c55e;
+    }
+
+    .sidebar {
+        width: 240px;
+        padding: 26px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .sidebar-header {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .sidebar-title {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .sidebar-subtitle {
+        font-size: 13px;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .nav-link {
+        display: block;
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background: rgba(148, 163, 184, 0.08);
+        color: inherit;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .nav-link:hover {
+        background: rgba(56, 189, 248, 0.18);
+        border-color: rgba(56, 189, 248, 0.45);
+        transform: translateX(2px);
+    }
+
+    .nav-link.is-active {
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(37, 99, 235, 0.28));
+        border-color: rgba(59, 130, 246, 0.55);
+        box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 28px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: rgba(15, 23, 42, 0.8);
+        margin-bottom: 24px;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.06em;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+        color: rgba(226, 232, 240, 0.8);
+    }
+
+    .section-card {
+        padding: 24px 28px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: rgba(15, 23, 42, 0.78);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .section-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .section-actions button,
+    .filter-grid button {
+        background: rgba(148, 163, 184, 0.15);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        color: inherit;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 13px;
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px 18px;
+        align-items: end;
+    }
+
+    .filter-grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .filter-grid input,
+    .filter-grid select,
+    .modal-body input,
+    .modal-body textarea,
+    .modal-body select {
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.65);
+        color: inherit;
+        font: inherit;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th,
+    td {
+        text-align: left;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        vertical-align: middle;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        background: rgba(148, 163, 184, 0.15);
+    }
+
+    .status-badge[data-status="running"] {
+        background: rgba(250, 204, 21, 0.2);
+        color: var(--warning);
+    }
+
+    .status-badge[data-status="stopped"] {
+        background: rgba(148, 163, 184, 0.12);
+    }
+
+    .table-actions {
+        display: inline-flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .table-actions button {
+        background: transparent;
+        border: 1px solid rgba(148, 163, 184, 0.32);
+        color: inherit;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+    }
+
+    .table-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .pager {
+        display: inline-flex;
+        gap: 8px;
+    }
+
+    .pager button[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .modal {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+    }
+
+    .modal.hidden {
+        display: none;
+    }
+
+    .modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(6px);
+    }
+
+    .modal-content {
+        position: relative;
+        width: min(900px, 94vw);
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 28px 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+    }
+
+    .modal-close {
+        background: transparent;
+        border: none;
+        color: inherit;
+        font-size: 24px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .modal-body {
+        display: grid;
+        gap: 18px;
+    }
+
+    .form-grid {
+        display: grid;
+        gap: 12px 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .form-grid textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+
+    .trigger-preview {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .modal-footer button {
+        padding: 10px 18px;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(148, 163, 184, 0.18);
+        color: inherit;
+        font-size: 14px;
+    }
+
+    .toast {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(56, 189, 248, 0.85);
+        color: white;
+        box-shadow: 0 10px 30px rgba(56, 189, 248, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 1200;
+    }
+
+    .toast.error {
+        background: rgba(239, 68, 68, 0.85);
+        box-shadow: 0 10px 30px rgba(239, 68, 68, 0.35);
+    }
+
+    .toast.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    @media (max-width: 1024px) {
+        .page-layout {
+            flex-direction: column;
+        }
+
+        .sidebar {
+            width: 100%;
+        }
+
+        .sidebar-nav {
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            flex: 1 1 160px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header card">
+    <div>
+        <h1>任务管理</h1>
+        <div class="muted">按执行器维护调度任务，支持新增、编辑、启停与手动触发</div>
+    </div>
+    <div class="user-info">
+        <span id="welcome-user">--</span>
+        <button id="logout" type="button">退出登录</button>
+    </div>
+</div>
+
+<section class="section-card card">
+    <div class="section-header">
+        <div>
+            <h2>任务列表</h2>
+            <div class="muted">查看任务状态并执行操作</div>
+        </div>
+        <div class="section-actions">
+            <button id="open-job-modal" type="button">新增任务</button>
+            <button id="reload-jobs" type="button">刷新</button>
+        </div>
+    </div>
+    <form id="job-filter-form" class="filter-grid">
+        <label>
+            执行器
+            <select id="job-filter-group" required></select>
+        </label>
+        <label>
+            任务状态
+            <select id="job-filter-status">
+                <option value="">全部</option>
+                <option value="1">运行中</option>
+                <option value="0">停止</option>
+            </select>
+        </label>
+        <label>
+            任务描述
+            <input id="job-filter-desc" type="text" placeholder="模糊匹配" />
+        </label>
+        <label>
+            Handler
+            <input id="job-filter-handler" type="text" placeholder="执行器 Handler" />
+        </label>
+        <label>
+            负责人
+            <input id="job-filter-author" type="text" placeholder="维护人" />
+        </label>
+        <div class="form-actions">
+            <button type="submit">查询</button>
+            <button type="button" id="job-reset">重置</button>
+        </div>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>任务描述</th>
+                <th>调度方式</th>
+                <th>执行器</th>
+                <th>Handler</th>
+                <th>状态</th>
+                <th>下次调度</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="job-table-body">
+            <tr>
+                <td colspan="8" class="muted">请选择执行器</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="table-footer">
+        <div>共 <span id="job-total">0</span> 条记录</div>
+        <div class="pager">
+            <button type="button" id="job-prev">上一页</button>
+            <button type="button" id="job-next">下一页</button>
+        </div>
+    </div>
+</section>
+
+<div class="modal hidden" id="job-modal">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-content card">
+        <div class="modal-header">
+            <h3 id="job-modal-title">新增任务</h3>
+            <button class="modal-close" type="button" data-modal-close>&times;</button>
+        </div>
+        <form id="job-form">
+            <div class="modal-body">
+                <div class="form-grid">
+                    <label>
+                        执行器
+                        <select id="job-group" name="job_group" required></select>
+                    </label>
+                    <label>
+                        任务描述
+                        <input id="job-desc" name="job_desc" type="text" required />
+                    </label>
+                    <label>
+                        负责人
+                        <input id="job-author" name="author" type="text" placeholder="可选" />
+                    </label>
+                    <label>
+                        报警邮箱
+                        <input id="job-email" name="alarm_email" type="email" placeholder="多个以逗号分隔" />
+                    </label>
+                    <label>
+                        调度类型
+                        <select id="job-schedule-type" name="schedule_type">
+                            <option value="CRON">CRON</option>
+                            <option value="FIX_RATE">固定频率 (秒)</option>
+                            <option value="FIX_DELAY">固定延迟 (秒)</option>
+                            <option value="NONE">手动触发</option>
+                        </select>
+                    </label>
+                    <label>
+                        调度配置
+                        <input id="job-schedule-conf" name="schedule_conf" type="text" placeholder="CRON 表达式或秒数" />
+                    </label>
+                    <label>
+                        错过策略
+                        <select id="job-misfire" name="misfire_strategy">
+                            <option value="DO_NOTHING">忽略</option>
+                            <option value="FIRE_ONCE_NOW">立即执行一次</option>
+                        </select>
+                    </label>
+                    <label>
+                        路由策略
+                        <select id="job-route" name="executor_route_strategy">
+                            <option value="FIRST">第一个</option>
+                            <option value="LAST">最后一个</option>
+                            <option value="ROUND">轮询</option>
+                            <option value="RANDOM">随机</option>
+                            <option value="CONSISTENT_HASH">一致性 HASH</option>
+                            <option value="LEAST_FREQUENTLY_USED">最不经常使用</option>
+                            <option value="LEAST_RECENTLY_USED">最近最久未使用</option>
+                            <option value="FAILOVER">故障转移</option>
+                            <option value="BUSYOVER">忙碌转移</option>
+                            <option value="SHARDING_BROADCAST">分片广播</option>
+                        </select>
+                    </label>
+                    <label>
+                        阻塞策略
+                        <select id="job-block" name="executor_block_strategy">
+                            <option value="SERIAL_EXECUTION">单机串行</option>
+                            <option value="DISCARD_LATER">丢弃后续</option>
+                            <option value="COVER_EARLY">覆盖之前</option>
+                        </select>
+                    </label>
+                    <label>
+                        Handler
+                        <input id="job-handler" name="executor_handler" type="text" placeholder="示例：demoJobHandler" />
+                    </label>
+                    <label>
+                        任务参数
+                        <textarea id="job-param" name="executor_param" placeholder="JSON 或文本"></textarea>
+                    </label>
+                    <label>
+                        超时时间 (秒)
+                        <input id="job-timeout" name="executor_timeout" type="number" min="0" value="0" />
+                    </label>
+                    <label>
+                        失败重试次数
+                        <input id="job-retry" name="executor_fail_retry_count" type="number" min="0" value="0" />
+                    </label>
+                    <label>
+                        Glue 类型
+                        <select id="job-glue" name="glue_type">
+                            <option value="BEAN">BEAN</option>
+                            <option value="GLUE_GROOVY">GLUE Groovy</option>
+                            <option value="GLUE_SHELL">GLUE Shell</option>
+                            <option value="GLUE_PYTHON">GLUE Python</option>
+                            <option value="GLUE_PHP">GLUE PHP</option>
+                            <option value="GLUE_NODEJS">GLUE Nodejs</option>
+                            <option value="GLUE_POWERSHELL">GLUE PowerShell</option>
+                        </select>
+                    </label>
+                    <label>
+                        Glue 备注
+                        <input id="job-glue-remark" name="glue_remark" type="text" placeholder="可选" />
+                    </label>
+                    <label>
+                        子任务 ID
+                        <input id="job-child" name="child_jobid" type="text" placeholder="多个以逗号分隔" />
+                    </label>
+                </div>
+                <div class="trigger-preview">
+                    <button type="button" id="preview-trigger">预览最近执行时间</button>
+                    <div id="trigger-preview-list" class="muted" style="font-size: 13px;">--</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" data-modal-close>取消</button>
+                <button type="submit">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal hidden" id="trigger-modal">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-content card" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3>手动触发任务</h3>
+            <button class="modal-close" type="button" data-modal-close>&times;</button>
+        </div>
+        <form id="trigger-form">
+            <div class="modal-body form-grid">
+                <label>
+                    执行参数
+                    <textarea id="trigger-param" name="executor_param" placeholder="可选"></textarea>
+                </label>
+                <label>
+                    执行地址
+                    <input id="trigger-address" name="address_list" type="text" placeholder="留空表示自动选择" />
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" data-modal-close>取消</button>
+                <button type="submit">立即触发</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const TOKEN_KEY = "xxl_admin_token";
+    const USERNAME_KEY = "xxl_admin_username";
+    const JOB_GROUPS_ENDPOINT = "{{ job_groups_endpoint }}";
+    const JOB_INFO_ENDPOINT = "{{ job_info_endpoint }}";
+    const JOB_INFO_NEXT_TRIGGER_ENDPOINT = "{{ job_info_next_trigger_endpoint }}";
+
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+        window.location.replace("/admin/");
+    }
+
+    const welcomeUser = document.getElementById("welcome-user");
+    const logoutBtn = document.getElementById("logout");
+    const jobTableBody = document.getElementById("job-table-body");
+    const jobTotalEl = document.getElementById("job-total");
+    const jobFilterForm = document.getElementById("job-filter-form");
+    const toast = document.getElementById("toast");
+    const jobGroupSelect = document.getElementById("job-filter-group");
+    const jobModalGroupSelect = document.getElementById("job-group");
+    const scheduleTypeSelect = document.getElementById("job-schedule-type");
+    const scheduleConfInput = document.getElementById("job-schedule-conf");
+    const triggerPreviewBtn = document.getElementById("preview-trigger");
+    const triggerPreviewList = document.getElementById("trigger-preview-list");
+    const jobModal = document.getElementById("job-modal");
+    const jobForm = document.getElementById("job-form");
+    const jobModalTitle = document.getElementById("job-modal-title");
+    const triggerModal = document.getElementById("trigger-modal");
+    const triggerForm = document.getElementById("trigger-form");
+
+    const jobFilters = {
+        job_group: "",
+        trigger_status: "",
+        job_desc: "",
+        executor_handler: "",
+        author: "",
+        start: 0,
+        length: 10,
+    };
+
+    const state = {
+        groupOptions: [],
+    };
+
+    let jobEditingId = null;
+    let triggerTargetJobId = null;
+    let currentJobs = [];
+
+    welcomeUser.textContent = localStorage.getItem(USERNAME_KEY) || "未登录";
+    jobTotalEl.dataset.total = '0';
+
+    logoutBtn.addEventListener("click", () => {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USERNAME_KEY);
+        window.location.replace("/admin/");
+    });
+
+    document.querySelectorAll('[data-modal-close]').forEach((el) => {
+        el.addEventListener('click', () => closeModal(el.closest('.modal')));
+    });
+
+    document.querySelectorAll('.modal').forEach((modal) => {
+        modal.addEventListener('click', (event) => {
+            if (event.target.classList.contains('modal-backdrop')) {
+                closeModal(modal);
+            }
+        });
+    });
+
+    document.getElementById('open-job-modal').addEventListener('click', () => {
+        jobEditingId = null;
+        jobForm.reset();
+        triggerPreviewList.textContent = '--';
+        jobModalTitle.textContent = '新增任务';
+        if (jobFilters.job_group) {
+            jobModalGroupSelect.value = jobFilters.job_group;
+        }
+        handleScheduleTypeChange();
+        openModal(jobModal);
+    });
+
+    document.getElementById('reload-jobs').addEventListener('click', () => {
+        syncFilters();
+        loadJobs(true);
+    });
+
+    jobFilterForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        syncFilters();
+        loadJobs(true);
+    });
+
+    document.getElementById('job-reset').addEventListener('click', () => {
+        document.getElementById('job-filter-status').value = '';
+        document.getElementById('job-filter-desc').value = '';
+        document.getElementById('job-filter-handler').value = '';
+        document.getElementById('job-filter-author').value = '';
+        syncFilters();
+        loadJobs(true);
+    });
+
+    document.getElementById('job-prev').addEventListener('click', () => {
+        if (jobFilters.start >= jobFilters.length) {
+            jobFilters.start -= jobFilters.length;
+            loadJobs();
+        }
+    });
+
+    document.getElementById('job-next').addEventListener('click', () => {
+        const total = Number(jobTotalEl.dataset.total || 0);
+        if (jobFilters.start + jobFilters.length < total) {
+            jobFilters.start += jobFilters.length;
+            loadJobs();
+        }
+    });
+
+    scheduleTypeSelect.addEventListener('change', handleScheduleTypeChange);
+
+    triggerPreviewBtn.addEventListener('click', async () => {
+        try {
+            const params = new URLSearchParams({
+                scheduleType: scheduleTypeSelect.value,
+                scheduleConf: scheduleConfInput.value,
+            });
+            const previews = await fetchJson(`${JOB_INFO_NEXT_TRIGGER_ENDPOINT}?${params.toString()}`);
+            triggerPreviewList.textContent = Array.isArray(previews) && previews.length
+                ? previews.join('，')
+                : '暂无可用执行时间';
+        } catch (error) {
+            triggerPreviewList.textContent = error.message || '预览失败';
+        }
+    });
+
+    jobForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(jobForm);
+        const payload = {
+            job_group: Number(formData.get('job_group')),
+            job_desc: formData.get('job_desc').trim(),
+            author: optionalValue(formData.get('author')),
+            alarm_email: optionalValue(formData.get('alarm_email')),
+            schedule_type: formData.get('schedule_type'),
+            schedule_conf: optionalValue(formData.get('schedule_conf')),
+            misfire_strategy: formData.get('misfire_strategy'),
+            executor_route_strategy: optionalValue(formData.get('executor_route_strategy')),
+            executor_handler: optionalValue(formData.get('executor_handler')),
+            executor_param: optionalValue(formData.get('executor_param')),
+            executor_block_strategy: optionalValue(formData.get('executor_block_strategy')),
+            executor_timeout: numberValue(formData.get('executor_timeout')),
+            executor_fail_retry_count: numberValue(formData.get('executor_fail_retry_count')),
+            glue_type: formData.get('glue_type'),
+            glue_remark: optionalValue(formData.get('glue_remark')),
+            child_jobid: optionalValue(formData.get('child_jobid')),
+        };
+        try {
+            if (jobEditingId) {
+                await fetchJson(`${JOB_INFO_ENDPOINT}/${jobEditingId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload),
+                });
+                showToast('任务已更新');
+            } else {
+                await fetchJson(JOB_INFO_ENDPOINT, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                });
+                showToast('任务已创建');
+            }
+            closeModal(jobModal);
+            loadJobs(true);
+        } catch (error) {
+            showToast(error.message || '保存失败', true);
+        }
+    });
+
+    triggerForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!triggerTargetJobId) {
+            showToast('未找到任务信息', true);
+            return;
+        }
+        const formData = new FormData(triggerForm);
+        const payload = {
+            executor_param: optionalValue(formData.get('executor_param')),
+            address_list: optionalValue(formData.get('address_list')),
+        };
+        try {
+            await fetchJson(`${JOB_INFO_ENDPOINT}/${triggerTargetJobId}/trigger`, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+            showToast('任务已触发');
+            closeModal(triggerModal);
+        } catch (error) {
+            showToast(error.message || '触发失败', true);
+        }
+    });
+
+    jobTableBody.addEventListener('click', async (event) => {
+        const action = event.target.closest('[data-action]');
+        if (!action) {
+            return;
+        }
+        const id = Number(action.dataset.id);
+        const job = currentJobs.find((item) => item.id === id);
+        if (!job) {
+            return;
+        }
+        switch (action.dataset.action) {
+            case 'edit':
+                jobEditingId = id;
+                jobModalTitle.textContent = `编辑任务 #${id}`;
+                fillJobForm(job);
+                openModal(jobModal);
+                break;
+            case 'delete':
+                if (confirm('确认删除该任务？')) {
+                    try {
+                        await fetchJson(`${JOB_INFO_ENDPOINT}/${id}`, { method: 'DELETE' });
+                        showToast('任务已删除');
+                        loadJobs(true);
+                    } catch (error) {
+                        showToast(error.message || '删除失败', true);
+                    }
+                }
+                break;
+            case 'start':
+                try {
+                    await fetchJson(`${JOB_INFO_ENDPOINT}/${id}/start`, { method: 'POST' });
+                    showToast('任务已启动');
+                    loadJobs();
+                } catch (error) {
+                    showToast(error.message || '操作失败', true);
+                }
+                break;
+            case 'stop':
+                try {
+                    await fetchJson(`${JOB_INFO_ENDPOINT}/${id}/stop`, { method: 'POST' });
+                    showToast('任务已停止');
+                    loadJobs();
+                } catch (error) {
+                    showToast(error.message || '操作失败', true);
+                }
+                break;
+            case 'trigger':
+                triggerTargetJobId = id;
+                triggerForm.reset();
+                openModal(triggerModal);
+                break;
+        }
+    });
+
+    refreshGroupOptions().then(() => {
+        syncFilters();
+        if (jobFilters.job_group) {
+            loadJobs(true);
+        } else {
+            jobTableBody.innerHTML = '<tr><td colspan="8" class="muted">请先创建执行器</td></tr>';
+        }
+    });
+
+    function syncFilters() {
+        jobFilters.job_group = jobGroupSelect.value;
+        jobFilters.trigger_status = document.getElementById('job-filter-status').value;
+        jobFilters.job_desc = document.getElementById('job-filter-desc').value.trim();
+        jobFilters.executor_handler = document.getElementById('job-filter-handler').value.trim();
+        jobFilters.author = document.getElementById('job-filter-author').value.trim();
+        jobFilters.start = 0;
+    }
+
+    async function refreshGroupOptions() {
+        try {
+            const params = new URLSearchParams({ start: '0', length: '200' });
+            const result = await fetchJson(`${JOB_GROUPS_ENDPOINT}?${params.toString()}`);
+            state.groupOptions = Array.isArray(result.data) ? result.data : [];
+        } catch (error) {
+            state.groupOptions = [];
+            showToast(error.message || '加载执行器失败', true);
+        }
+        updateGroupSelects();
+    }
+
+    function updateGroupSelects() {
+        const selects = [jobGroupSelect, jobModalGroupSelect];
+        selects.forEach((select) => {
+            if (!select) {
+                return;
+            }
+            const previous = select.value;
+            select.innerHTML = state.groupOptions
+                .map((group) => `<option value="${group.id}">${group.id} - ${escapeHtml(group.appname)}</option>`)
+                .join('');
+            if (!state.groupOptions.length) {
+                select.innerHTML = '<option value="">无执行器</option>';
+                select.value = '';
+                select.disabled = true;
+            } else if (previous && state.groupOptions.some((group) => String(group.id) === previous)) {
+                select.value = previous;
+                select.disabled = false;
+            } else {
+                select.value = String(state.groupOptions[0].id);
+                select.disabled = false;
+            }
+        });
+        if (jobGroupSelect) {
+            jobFilters.job_group = jobGroupSelect.value;
+        }
+    }
+
+    async function loadJobs(resetStart = false) {
+        if (!jobFilters.job_group) {
+            jobTableBody.innerHTML = '<tr><td colspan="8" class="muted">请选择执行器</td></tr>';
+            jobTotalEl.textContent = '0';
+            jobTotalEl.dataset.total = '0';
+            return;
+        }
+        if (resetStart) {
+            jobFilters.start = 0;
+        }
+        const params = new URLSearchParams({
+            start: String(jobFilters.start),
+            length: String(jobFilters.length),
+            job_group: jobFilters.job_group,
+        });
+        if (jobFilters.trigger_status) {
+            params.set('trigger_status', jobFilters.trigger_status);
+        }
+        if (jobFilters.job_desc) {
+            params.set('job_desc', jobFilters.job_desc);
+        }
+        if (jobFilters.executor_handler) {
+            params.set('executor_handler', jobFilters.executor_handler);
+        }
+        if (jobFilters.author) {
+            params.set('author', jobFilters.author);
+        }
+        jobTableBody.innerHTML = '<tr><td colspan="8" class="muted">加载中...</td></tr>';
+        try {
+            const result = await fetchJson(`${JOB_INFO_ENDPOINT}?${params.toString()}`);
+            currentJobs = Array.isArray(result.data) ? result.data : [];
+            const total = result.records_total ?? currentJobs.length;
+            jobTotalEl.textContent = total;
+            jobTotalEl.dataset.total = String(total);
+            renderJobTable(currentJobs);
+        } catch (error) {
+            jobTableBody.innerHTML = `<tr><td colspan="8" class="muted">${escapeHtml(error.message || '加载失败')}</td></tr>`;
+        }
+    }
+
+    function renderJobTable(jobs) {
+        if (!jobs.length) {
+            jobTableBody.innerHTML = '<tr><td colspan="8" class="muted">暂无任务</td></tr>';
+            return;
+        }
+        jobTableBody.innerHTML = jobs
+            .map((job) => {
+                const status = job.triggerStatus === 1 ? 'running' : 'stopped';
+                const statusText = status === 'running' ? '运行中' : '停止';
+                return `
+                    <tr>
+                        <td>${job.id}</td>
+                        <td>${escapeHtml(job.jobDesc || '--')}</td>
+                        <td>${formatSchedule(job)}</td>
+                        <td>${job.jobGroup}</td>
+                        <td>${escapeHtml(job.executorHandler || '--')}</td>
+                        <td><span class="status-badge" data-status="${status}">${statusText}</span></td>
+                        <td>${displayTimestamp(job.triggerNextTime)}</td>
+                        <td>
+                            <div class="table-actions">
+                                <button type="button" data-action="edit" data-id="${job.id}">编辑</button>
+                                <button type="button" data-action="${status === 'running' ? 'stop' : 'start'}" data-id="${job.id}">${status === 'running' ? '停止' : '启动'}</button>
+                                <button type="button" data-action="trigger" data-id="${job.id}">触发</button>
+                                <button type="button" data-action="delete" data-id="${job.id}">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            })
+            .join('');
+    }
+
+    function fillJobForm(job) {
+        jobForm.job_group.value = job.jobGroup;
+        jobForm.job_desc.value = job.jobDesc || '';
+        jobForm.author.value = job.author || '';
+        jobForm.alarm_email.value = job.alarmEmail || '';
+        jobForm.schedule_type.value = job.scheduleType || 'CRON';
+        jobForm.schedule_conf.value = job.scheduleConf || '';
+        jobForm.misfire_strategy.value = job.misfireStrategy || 'DO_NOTHING';
+        jobForm.executor_route_strategy.value = job.executorRouteStrategy || 'FIRST';
+        jobForm.executor_handler.value = job.executorHandler || '';
+        jobForm.executor_param.value = job.executorParam || '';
+        jobForm.executor_block_strategy.value = job.executorBlockStrategy || 'SERIAL_EXECUTION';
+        jobForm.executor_timeout.value = job.executorTimeout ?? 0;
+        jobForm.executor_fail_retry_count.value = job.executorFailRetryCount ?? 0;
+        jobForm.glue_type.value = job.glueType || 'BEAN';
+        jobForm.glue_remark.value = job.glueRemark || '';
+        jobForm.child_jobid.value = job.childJobid || '';
+        triggerPreviewList.textContent = '--';
+        handleScheduleTypeChange();
+    }
+
+    function handleScheduleTypeChange() {
+        if (scheduleTypeSelect.value === 'NONE') {
+            scheduleConfInput.placeholder = '无需填写，任务需手动触发';
+            scheduleConfInput.disabled = true;
+            scheduleConfInput.value = '';
+        } else if (scheduleTypeSelect.value === 'CRON') {
+            scheduleConfInput.placeholder = '例如：0 0 * * * ?';
+            scheduleConfInput.disabled = false;
+        } else {
+            scheduleConfInput.placeholder = '请输入间隔秒数';
+            scheduleConfInput.disabled = false;
+        }
+    }
+
+    async function fetchJson(url, options = {}) {
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                ...(options.headers || {}),
+            },
+        });
+        if (!response.ok) {
+            const message = await response.json().catch(() => ({}));
+            throw new Error(message.message || response.statusText);
+        }
+        return response.json();
+    }
+
+    function optionalValue(value) {
+        const trimmed = value ? String(value).trim() : '';
+        return trimmed ? trimmed : null;
+    }
+
+    function numberValue(value) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
+    }
+
+    function displayTimestamp(timestamp) {
+        if (!timestamp) {
+            return '--';
+        }
+        const date = new Date(Number(timestamp));
+        if (Number.isNaN(date.getTime())) {
+            return '--';
+        }
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function formatSchedule(job) {
+        if (job.scheduleType === 'NONE') {
+            return '手动触发';
+        }
+        if (job.scheduleType === 'CRON') {
+            return `CRON: ${escapeHtml(job.scheduleConf || '--')}`;
+        }
+        if (job.scheduleType === 'FIX_RATE') {
+            return `固定频率：${job.scheduleConf || '--'} 秒`;
+        }
+        if (job.scheduleType === 'FIX_DELAY') {
+            return `固定延迟：${job.scheduleConf || '--'} 秒`;
+        }
+        return escapeHtml(job.scheduleConf || '--');
+    }
+
+    function showToast(message, error = false) {
+        toast.textContent = message;
+        toast.classList.toggle('error', error);
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3200);
+    }
+
+    function openModal(modal) {
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal(modal) {
+        modal.classList.add('hidden');
+    }
+
+    function escapeHtml(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        return String(value).replace(/[&<>"']/g, (char) => {
+            switch (char) {
+                case '&':
+                    return '&amp;';
+                case '<':
+                    return '&lt;';
+                case '>':
+                    return '&gt;';
+                case '"':
+                    return '&quot;';
+                case "'":
+                    return '&#39;';
+                default:
+                    return char;
+            }
+        });
+    }
+</script>
+{% endblock %}

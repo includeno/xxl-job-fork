@@ -1,7 +1,25 @@
 {% extends "layout.html" %}
 
+{% block shell_class %}auth-shell{% endblock %}
+
 {% block head %}
 <style>
+    .auth-shell {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .auth-shell .page-layout {
+        width: 100%;
+        max-width: 520px;
+        justify-content: center;
+    }
+
+    .auth-shell .page-main {
+        max-width: 420px;
+    }
+
     .auth-card {
         max-width: 420px;
         padding: 48px 40px 40px;
