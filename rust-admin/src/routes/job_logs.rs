@@ -3,7 +3,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::{Duration, Local, NaiveDateTime};
 use sea_orm::{query::*, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -199,7 +199,7 @@ async fn kill(
     }
 
     model.handle_code = 500;
-    model.handle_time = Some(Utc::now().naive_utc());
+    model.handle_time = Some(Local::now().naive_local());
     let msg = format!("操作人 {} 强制终止任务", user.username);
     model.handle_msg = Some(match model.handle_msg {
         Some(existing) => format!("{}\n{}", existing, msg),
@@ -235,8 +235,8 @@ async fn clear(
     }
     if let Some(days) = payload.clear_before_days {
         if days > 0 {
-            let threshold = Utc::now() - Duration::days(days);
-            delete = delete.filter(job_log::Column::TriggerTime.lte(threshold.naive_utc()));
+            let threshold = Local::now() - Duration::days(days);
+            delete = delete.filter(job_log::Column::TriggerTime.lte(threshold.naive_local()));
         }
     }
 

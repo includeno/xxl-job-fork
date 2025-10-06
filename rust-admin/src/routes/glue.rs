@@ -3,7 +3,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::Utc;
+use chrono::Local;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -78,7 +78,7 @@ async fn save_glue(
         .await?
         .ok_or_else(|| AppError::NotFound("任务不存在".into()))?;
 
-    let now = Utc::now().naive_utc();
+    let now = Local::now().naive_local();
     job.glue_source = Some(payload.glue_source.clone());
     job.glue_remark = Some(payload.glue_remark.clone());
     job.glue_updatetime = Some(now);
