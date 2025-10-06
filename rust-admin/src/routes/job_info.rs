@@ -16,6 +16,7 @@ use crate::auth::AuthUser;
 use crate::entities::{job_group, job_info, job_log, job_registry};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
+use tracing::{debug, error, info, warn};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -333,10 +334,14 @@ async fn trigger_job(
 ) -> AppResult<Json<serde_json::Value>> {
     user.require_admin()?;
 
+    info!(job_id = id, "开始处理手动触发请求");
+
     let mut job = job_info::Entity::find_by_id(id)
         .one(state.db())
         .await?
         .ok_or_else(|| AppError::NotFound("任务不存在".into()))?;
+
+    info!(job_id = job.id, job_group = job.job_group, "已加载任务信息");
 
     let handler = job.executor_handler.clone().unwrap_or_default();
 
@@ -345,6 +350,12 @@ async fn trigger_job(
         .await?
         .ok_or_else(|| AppError::NotFound("执行器分组不存在".into()))?;
 
+    debug!(
+        job_id = job.id,
+        job_group = group.id,
+        "已加载执行器分组信息"
+    );
+
     let addresses =
         resolve_executor_addresses(&state, &group, payload.address_list.as_deref()).await?;
 
@@ -352,11 +363,24 @@ async fn trigger_job(
         return Err(AppError::BadRequest("未找到可用的执行器地址".into()));
     }
 
+    info!(
+        job_id = job.id,
+        address_count = addresses.len(),
+        "已确定执行器地址列表"
+    );
+    debug!(job_id = job.id, addresses = %addresses.join(","), "执行器地址详情");
+
     let now = Utc::now();
     let executor_param = payload
         .executor_param
         .clone()
         .or(job.executor_param.clone());
+
+    debug!(
+        job_id = job.id,
+        has_executor_param = executor_param.is_some(),
+        "执行参数已准备"
+    );
 
     let log_active = job_log::ActiveModel {
         job_group: Set(job.job_group),
@@ -380,8 +404,12 @@ async fn trigger_job(
         ..Default::default()
     };
 
+    debug!(job_id = job.id, "准备插入新的任务日志");
+
     let inserted = job_log::Entity::insert(log_active).exec(state.db()).await?;
     let log_id = inserted.last_insert_id;
+
+    info!(job_id = job.id, log_id, "已创建任务日志");
 
     let trigger_param = build_trigger_param(
         &job,
@@ -390,14 +418,23 @@ async fn trigger_job(
         handler,
         executor_param,
     );
+    debug!(job_id = job.id, log_id, "已构建执行器触发参数");
     let mut trigger_lines = vec![format!("手动触发任务，触发人: {}", user.username)];
     trigger_lines.push(format!("候选执行器地址: {}", addresses.join(", ")));
+
+    info!(job_id = job.id, log_id, "准备触发执行器");
 
     let mut final_code = 500;
     let mut final_msg: Option<String> = None;
     let mut final_address: Option<String> = None;
 
     for address in &addresses {
+        info!(
+            job_id = job.id,
+            log_id,
+            executor_address = address.as_str(),
+            "尝试触发执行器"
+        );
         match trigger_executor(
             state.http_client(),
             address.as_str(),
@@ -407,6 +444,13 @@ async fn trigger_job(
         .await
         {
             Ok(result) => {
+                info!(
+                    job_id = job.id,
+                    log_id,
+                    executor_address = address.as_str(),
+                    code = result.code,
+                    "执行器返回结果"
+                );
                 final_code = result.code;
                 final_msg = result.msg.clone();
                 final_address = Some(address.clone());
@@ -421,16 +465,30 @@ async fn trigger_job(
                 trigger_lines.push(line);
 
                 if result.code == 200 {
+                    info!(
+                        job_id = job.id,
+                        log_id,
+                        executor_address = address.as_str(),
+                        "执行器触发成功"
+                    );
                     break;
                 }
             }
             Err(err) => {
+                warn!(
+                    job_id = job.id,
+                    log_id,
+                    executor_address = address.as_str(),
+                    error = %err,
+                    "调用执行器失败"
+                );
                 trigger_lines.push(format!("调用执行器 `{}` 失败: {}", address, err));
             }
         }
     }
 
     if final_address.is_none() {
+        error!(job_id = job.id, log_id, "所有候选执行器触发失败");
         trigger_lines.push("所有可用执行器均触发失败".into());
     }
 
@@ -445,12 +503,19 @@ async fn trigger_job(
     };
     job_log::Entity::update(update_log).exec(state.db()).await?;
 
+    debug!(job_id = job.id, log_id, "已更新任务日志触发结果");
+
     job.trigger_last_time = now.timestamp_millis();
     if let Some(next) = compute_next_trigger(&job)? {
         job.trigger_next_time = next;
     }
+    let job_id = job.id;
     let active: job_info::ActiveModel = job.into();
     active.update(state.db()).await?;
+
+    debug!(job_id = job_id, "已更新任务触发时间信息");
+
+    info!(job_id = job_id, log_id, code = final_code, "触发流程结束");
 
     let response_message = if final_code == 200 {
         "触发成功".to_string()
@@ -533,12 +598,19 @@ async fn trigger_executor(
     }
     address.push_str("run");
 
+    debug!(
+        executor_address = raw_address,
+        url = address,
+        "发送执行器触发请求"
+    );
+
     let mut request = client.post(address).json(payload);
     if let Some(token) = access_token {
         request = request.header("XXL-JOB-ACCESS-TOKEN", token);
     }
 
     let response = request.send().await?;
+    debug!(executor_address = raw_address, status = %response.status(), "收到执行器响应");
     if !response.status().is_success() {
         return Err(anyhow::anyhow!(
             "执行器返回非成功状态码: {}",
@@ -555,21 +627,46 @@ async fn resolve_executor_addresses(
     override_address: Option<&str>,
 ) -> AppResult<Vec<String>> {
     if let Some(raw) = override_address {
+        debug!(job_group = group.id, "收到手动指定执行器地址");
         let list = parse_address_list(raw);
         if !list.is_empty() {
+            info!(
+                job_group = group.id,
+                address_count = list.len(),
+                "使用手动指定的执行器地址"
+            );
             return Ok(list);
         }
+        warn!(
+            job_group = group.id,
+            "手动指定的执行器地址为空或无效，继续尝试其它来源"
+        );
     }
 
     if group.address_type == 1 {
         if let Some(raw) = group.address_list.as_deref() {
+            debug!(job_group = group.id, "尝试使用执行器分组静态地址");
             let list = parse_address_list(raw);
             if !list.is_empty() {
+                info!(
+                    job_group = group.id,
+                    address_count = list.len(),
+                    "使用执行器分组的静态地址"
+                );
                 return Ok(list);
             }
+            warn!(
+                job_group = group.id,
+                "执行器分组静态地址列表为空，尝试从注册中心获取"
+            );
         }
     }
 
+    info!(
+        job_group = group.id,
+        app_name = group.app_name.as_str(),
+        "从注册中心查询执行器地址"
+    );
     let registries = job_registry::Entity::find()
         .filter(job_registry::Column::RegistryGroup.eq("EXECUTOR"))
         .filter(job_registry::Column::RegistryKey.eq(group.app_name.as_str()))
@@ -586,11 +683,17 @@ async fn resolve_executor_addresses(
     }
 
     if list.is_empty() {
+        error!(job_group = group.id, "未检测到可用执行器实例");
         return Err(AppError::BadRequest(
             "未检测到可用的执行器实例，请确认执行器是否注册成功".into(),
         ));
     }
 
+    info!(
+        job_group = group.id,
+        address_count = list.len(),
+        "成功解析执行器地址"
+    );
     Ok(list)
 }
 
