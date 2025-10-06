@@ -338,10 +338,7 @@ async fn trigger_job(
         .await?
         .ok_or_else(|| AppError::NotFound("任务不存在".into()))?;
 
-    let handler = job
-        .executor_handler
-        .clone()
-        .ok_or_else(|| AppError::BadRequest("任务未配置执行器 Handler".into()))?;
+    let handler = job.executor_handler.clone().unwrap_or_default();
 
     let group = job_group::Entity::find_by_id(job.job_group)
         .one(state.db())
@@ -351,10 +348,9 @@ async fn trigger_job(
     let addresses =
         resolve_executor_addresses(&state, &group, payload.address_list.as_deref()).await?;
 
-    let address = addresses
-        .first()
-        .cloned()
-        .ok_or_else(|| AppError::BadRequest("未找到可用的执行器地址".into()))?;
+    if addresses.is_empty() {
+        return Err(AppError::BadRequest("未找到可用的执行器地址".into()));
+    }
 
     let now = Utc::now();
     let executor_param = payload
@@ -365,8 +361,12 @@ async fn trigger_job(
     let log_active = job_log::ActiveModel {
         job_group: Set(job.job_group),
         job_id: Set(job.id),
-        executor_address: Set(Some(address.clone())),
-        executor_handler: Set(Some(handler.clone())),
+        executor_address: Set(None),
+        executor_handler: Set(if handler.trim().is_empty() {
+            None
+        } else {
+            Some(handler.clone())
+        }),
         executor_param: Set(executor_param.clone()),
         executor_sharding_param: Set(None),
         executor_fail_retry_count: Set(job.executor_fail_retry_count),
@@ -390,41 +390,56 @@ async fn trigger_job(
         handler,
         executor_param,
     );
-    let trigger_result = trigger_executor(
-        state.http_client(),
-        address.as_str(),
-        state.settings().executor.access_token(),
-        &trigger_param,
-    )
-    .await;
+    let mut trigger_lines = vec![format!("手动触发任务，触发人: {}", user.username)];
+    trigger_lines.push(format!("候选执行器地址: {}", addresses.join(", ")));
 
-    let trigger_code;
-    let mut trigger_lines = vec![format!(
-        "手动触发任务，触发人: {}，执行器地址: {}",
-        user.username, address
-    )];
+    let mut final_code = 500;
+    let mut final_msg: Option<String> = None;
+    let mut final_address: Option<String> = None;
 
-    match trigger_result {
-        Ok(result) => {
-            trigger_code = result.code;
-            if let Some(msg) = result.msg.filter(|m| !m.trim().is_empty()) {
-                trigger_lines.push(format!("执行器返回信息: {}", msg));
+    for address in &addresses {
+        match trigger_executor(
+            state.http_client(),
+            address.as_str(),
+            state.settings().executor.access_token(),
+            &trigger_param,
+        )
+        .await
+        {
+            Ok(result) => {
+                final_code = result.code;
+                final_msg = result.msg.clone();
+                final_address = Some(address.clone());
+
+                let mut line = format!("执行器 `{}` 返回 code = {}", address, result.code);
+                if let Some(msg) = result.msg.as_ref().filter(|m| !m.trim().is_empty()) {
+                    line.push_str(&format!(", msg = {}", msg));
+                }
+                if let Some(content) = result.content.as_ref().filter(|c| !c.trim().is_empty()) {
+                    line.push_str(&format!(", content = {}", content));
+                }
+                trigger_lines.push(line);
+
+                if result.code == 200 {
+                    break;
+                }
             }
-            if let Some(content) = result.content.filter(|c| !c.trim().is_empty()) {
-                trigger_lines.push(format!("执行器返回内容: {}", content));
+            Err(err) => {
+                trigger_lines.push(format!("调用执行器 `{}` 失败: {}", address, err));
             }
         }
-        Err(err) => {
-            trigger_code = 500;
-            trigger_lines.push(format!("触发执行器失败: {}", err));
-        }
+    }
+
+    if final_address.is_none() {
+        trigger_lines.push("所有可用执行器均触发失败".into());
     }
 
     let trigger_msg = trigger_lines.join("<br>");
 
     let update_log = job_log::ActiveModel {
         id: Set(log_id),
-        trigger_code: Set(trigger_code),
+        executor_address: Set(final_address.clone()),
+        trigger_code: Set(final_code),
         trigger_msg: Set(Some(trigger_msg)),
         ..Default::default()
     };
@@ -437,10 +452,18 @@ async fn trigger_job(
     let active: job_info::ActiveModel = job.into();
     active.update(state.db()).await?;
 
-    Ok(Json(json!({ "message": "触发成功" })))
+    let response_message = if final_code == 200 {
+        "触发成功".to_string()
+    } else if let Some(msg) = final_msg.filter(|m| !m.trim().is_empty()) {
+        format!("触发失败: {}", msg)
+    } else {
+        "触发失败".to_string()
+    };
+
+    Ok(Json(json!({ "message": response_message })))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct TriggerParamPayload {
     job_id: i32,
@@ -531,14 +554,16 @@ async fn resolve_executor_addresses(
     group: &job_group::Model,
     override_address: Option<&str>,
 ) -> AppResult<Vec<String>> {
-    if let Some(list) = override_address.and_then(parse_address_list) {
+    if let Some(raw) = override_address {
+        let list = parse_address_list(raw);
         if !list.is_empty() {
             return Ok(list);
         }
     }
 
     if group.address_type == 1 {
-        if let Some(list) = group.address_list.as_deref().and_then(parse_address_list) {
+        if let Some(raw) = group.address_list.as_deref() {
+            let list = parse_address_list(raw);
             if !list.is_empty() {
                 return Ok(list);
             }
@@ -551,11 +576,14 @@ async fn resolve_executor_addresses(
         .all(state.db())
         .await?;
 
-    let list: Vec<String> = registries
-        .into_iter()
-        .map(|item| item.registry_value)
-        .filter(|value| !value.trim().is_empty())
-        .collect();
+    let mut list: Vec<String> = Vec::new();
+    for item in registries {
+        if let Some(address) = normalize_executor_address(&item.registry_value) {
+            if !list.contains(&address) {
+                list.push(address);
+            }
+        }
+    }
 
     if list.is_empty() {
         return Err(AppError::BadRequest(
@@ -566,19 +594,31 @@ async fn resolve_executor_addresses(
     Ok(list)
 }
 
-fn parse_address_list(input: &str) -> Option<Vec<String>> {
-    let values: Vec<String> = input
-        .split([',', '\n'])
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-        .map(|value| value.to_string())
-        .collect();
-
-    if values.is_empty() {
-        None
-    } else {
-        Some(values)
+fn parse_address_list(input: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    for value in input.split([',', '\n']) {
+        if let Some(address) = normalize_executor_address(value) {
+            if !values.contains(&address) {
+                values.push(address);
+            }
+        }
     }
+    values
+}
+
+fn normalize_executor_address(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let normalized = if trimmed.contains("://") {
+        trimmed.to_string()
+    } else {
+        format!("http://{}", trimmed)
+    };
+
+    Some(normalized)
 }
 
 #[derive(Debug, Deserialize)]
