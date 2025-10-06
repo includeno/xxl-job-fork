@@ -21,10 +21,32 @@
 
 1. **配置数据库连接**：
 
-   可以修改 `config/default.toml` 中的 `database.url`，或在启动时通过环境变量覆盖：
+   可以修改 `config/default.toml` 中的 `database.*` 字段，或在启动时通过环境变量覆盖。例如：
+
+   ```toml
+   [database]
+   url = "jdbc:mysql://127.0.0.1:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8"
+   username = "root"
+   password = "root_pwd"
+   driver-class-name = "com.mysql.cj.jdbc.Driver"
+   ```
+
+   也可以使用环境变量：
 
    ```bash
-   export RUST_ADMIN__DATABASE__URL="mysql://user:pass@localhost:3306/xxl_job"
+   export RUST_ADMIN__DATABASE__URL="jdbc:mysql://127.0.0.1:3306/xxl_job"
+   export RUST_ADMIN__DATABASE__USERNAME="root"
+   export RUST_ADMIN__DATABASE__PASSWORD="root_pwd"
+   export RUST_ADMIN__DATABASE__DRIVER_CLASS_NAME="com.mysql.cj.jdbc.Driver"
+   ```
+
+   同时保持兼容原 Spring Boot 的 `spring.datasource.*` 配置方式，例如：
+
+   ```bash
+   export SPRING_DATASOURCE_URL="jdbc:mysql://127.0.0.1:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8"
+   export SPRING_DATASOURCE_USERNAME="root"
+   export SPRING_DATASOURCE_PASSWORD="root_pwd"
+   export SPRING_DATASOURCE_DRIVER_CLASS_NAME="com.mysql.cj.jdbc.Driver"
    ```
 
 2. **运行服务**：
