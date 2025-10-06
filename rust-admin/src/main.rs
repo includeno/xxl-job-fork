@@ -24,7 +24,8 @@ async fn main() -> anyhow::Result<()> {
 
     let settings = Settings::load()?;
     let addr: SocketAddr = settings.server.socket_addr()?;
-    let db = Database::connect(&settings.database.url).await?;
+    let database_url = settings.database_url()?;
+    let db = Database::connect(&database_url).await?;
 
     let state = AppState::new(db, settings);
     let app = routes::create_router(state);

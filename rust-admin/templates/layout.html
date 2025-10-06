@@ -18,9 +18,6 @@
             background: radial-gradient(circle at top, rgba(15, 118, 110, 0.25), transparent 55%),
                 radial-gradient(circle at bottom, rgba(59, 130, 246, 0.2), transparent 55%),
                 #0f172a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
 
         a {
@@ -29,8 +26,22 @@
 
         .app-shell {
             width: 100%;
+            min-height: 100vh;
             padding: 32px 16px;
             box-sizing: border-box;
+        }
+
+        .page-layout {
+            display: flex;
+            gap: 28px;
+            min-height: calc(100vh - 64px);
+        }
+
+        .page-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
         }
 
         .card {
@@ -39,7 +50,6 @@
             border: 1px solid rgba(148, 163, 184, 0.2);
             border-radius: 18px;
             box-shadow: 0 12px 45px rgba(15, 23, 42, 0.45);
-            margin: 0 auto;
         }
 
         .muted {
@@ -50,7 +60,8 @@
             cursor: pointer;
         }
 
-        input, button {
+        input,
+        button {
             font: inherit;
         }
 
@@ -63,8 +74,15 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-<div class="app-shell">
-    {% block content %}{% endblock %}
+<div class="app-shell {% block shell_class %}{% endblock %}">
+    {% block shell %}
+    <div class="page-layout">
+        {% block sidebar %}{% endblock %}
+        <main class="page-main">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% endblock %}
 </div>
 {% block scripts %}{% endblock %}
 </body>
