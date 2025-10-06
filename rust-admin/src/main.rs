@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod entities;
 mod error;
+mod request_preview;
 mod routes;
 mod state;
 mod templates;

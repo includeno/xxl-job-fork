@@ -16,6 +16,7 @@ use validator::Validate;
 use crate::auth::AuthUser;
 use crate::entities::{job_group, job_info, job_log, job_registry};
 use crate::error::{AppError, AppResult};
+use crate::request_preview::{format_executor_request_curl, to_pretty_json};
 use crate::state::AppState;
 use tracing::{debug, error, info, warn};
 
@@ -644,10 +645,15 @@ async fn trigger_executor(
             format!("{:?}", payload)
         }
     };
+    let curl_preview = format_executor_request_curl(address.as_str(), access_token, &request_body);
+    let pretty_body = to_pretty_json(payload).unwrap_or_else(|| request_body.clone());
+
     info!(
         executor_address = raw_address,
         url = address.as_str(),
         request_body = %request_body,
+        pretty_request_body = %pretty_body,
+        curl = %curl_preview,
         "发送执行器触发请求"
     );
 
