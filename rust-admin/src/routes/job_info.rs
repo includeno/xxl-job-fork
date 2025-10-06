@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::str::FromStr;
 
 use axum::{
@@ -688,43 +689,65 @@ async fn resolve_executor_addresses(
         .all(state.db())
         .await?;
 
-    let mut list: Vec<String> = Vec::new();
-    let mut skipped = 0usize;
+    let mut unique = HashSet::new();
+    let mut alive: Vec<String> = Vec::new();
+    let mut stale: Vec<(String, Option<chrono::NaiveDateTime>)> = Vec::new();
+
     for item in registries {
+        let Some(address) = normalize_executor_address(&item.registry_value) else {
+            continue;
+        };
+
+        if !unique.insert(address.clone()) {
+            continue;
+        }
+
         if item.update_time.map(|t| t >= cutoff).unwrap_or(false) {
-            if let Some(address) = normalize_executor_address(&item.registry_value) {
-                if !list.contains(&address) {
-                    list.push(address);
-                }
-            }
+            alive.push(address);
         } else {
-            skipped += 1;
+            stale.push((address, item.update_time));
         }
     }
 
-    if skipped > 0 {
+    if !stale.is_empty() {
+        let last_seen = stale
+            .iter()
+            .filter_map(|(_, ts)| *ts)
+            .max();
         warn!(
             job_group = group.id,
-            skipped,
+            skipped = stale.len(),
             cutoff = cutoff.to_string(),
+            last_seen = last_seen.map(|ts| ts.to_string()),
             "剔除超过心跳超时时间的执行器实例"
         );
     }
 
-    if list.is_empty() {
-        error!(job_group = group.id, "未检测到可用执行器实例");
-        return Err(AppError::BadRequest(
-            "未检测到可用的执行器实例，请确认执行器是否注册成功并保持心跳".into(),
-        ));
+    if !alive.is_empty() {
+        info!(
+            job_group = group.id,
+            address_count = alive.len(),
+            stale_skipped = stale.len(),
+            "成功解析执行器地址"
+        );
+        return Ok(alive);
     }
 
-    info!(
-        job_group = group.id,
-        address_count = list.len(),
-        stale_skipped = skipped,
-        "成功解析执行器地址"
-    );
-    Ok(list)
+    if !stale.is_empty() {
+        let fallback: Vec<String> = stale.into_iter().map(|(addr, _)| addr).collect();
+        warn!(
+            job_group = group.id,
+            address_count = fallback.len(),
+            cutoff = cutoff.to_string(),
+            "所有实例心跳超时，回退返回最近一次上报的执行器地址"
+        );
+        return Ok(fallback);
+    }
+
+    error!(job_group = group.id, "未检测到可用执行器实例");
+    Err(AppError::BadRequest(
+        "未检测到可用的执行器实例，请确认执行器是否注册成功并保持心跳".into(),
+    ))
 }
 
 fn parse_address_list(input: &str) -> Vec<String> {
