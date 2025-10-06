@@ -13,7 +13,7 @@ use serde_json::json;
 use validator::Validate;
 
 use crate::auth::AuthUser;
-use crate::entities::{job_group, job_info, job_log};
+use crate::entities::{job_group, job_info, job_log, job_registry};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 
@@ -338,33 +338,97 @@ async fn trigger_job(
         .await?
         .ok_or_else(|| AppError::NotFound("任务不存在".into()))?;
 
-    let now = Utc::now();
-    let trigger_msg = format!(
-        "手动触发任务，触发人: {}，地址: {:?}",
-        user.username, payload.address_list
-    );
+    let handler = job
+        .executor_handler
+        .clone()
+        .ok_or_else(|| AppError::BadRequest("任务未配置执行器 Handler".into()))?;
 
-    let log = job_log::ActiveModel {
+    let group = job_group::Entity::find_by_id(job.job_group)
+        .one(state.db())
+        .await?
+        .ok_or_else(|| AppError::NotFound("执行器分组不存在".into()))?;
+
+    let addresses =
+        resolve_executor_addresses(&state, &group, payload.address_list.as_deref()).await?;
+
+    let address = addresses
+        .first()
+        .cloned()
+        .ok_or_else(|| AppError::BadRequest("未找到可用的执行器地址".into()))?;
+
+    let now = Utc::now();
+    let executor_param = payload
+        .executor_param
+        .clone()
+        .or(job.executor_param.clone());
+
+    let log_active = job_log::ActiveModel {
         job_group: Set(job.job_group),
         job_id: Set(job.id),
-        executor_address: Set(payload.address_list.clone()),
-        executor_handler: Set(job.executor_handler.clone()),
-        executor_param: Set(payload
-            .executor_param
-            .clone()
-            .or(job.executor_param.clone())),
+        executor_address: Set(Some(address.clone())),
+        executor_handler: Set(Some(handler.clone())),
+        executor_param: Set(executor_param.clone()),
         executor_sharding_param: Set(None),
         executor_fail_retry_count: Set(job.executor_fail_retry_count),
         trigger_time: Set(Some(now.naive_utc())),
-        trigger_code: Set(200),
-        trigger_msg: Set(Some(trigger_msg)),
+        trigger_code: Set(0),
+        trigger_msg: Set(None),
         handle_time: Set(None),
         handle_code: Set(0),
         handle_msg: Set(None),
         alarm_status: Set(0),
         ..Default::default()
     };
-    job_log::Entity::insert(log).exec(state.db()).await?;
+
+    let inserted = job_log::Entity::insert(log_active).exec(state.db()).await?;
+    let log_id = inserted.last_insert_id;
+
+    let trigger_param = build_trigger_param(
+        &job,
+        log_id,
+        now.timestamp_millis(),
+        handler,
+        executor_param,
+    );
+    let trigger_result = trigger_executor(
+        state.http_client(),
+        address.as_str(),
+        state.settings().executor.access_token(),
+        &trigger_param,
+    )
+    .await;
+
+    let trigger_code;
+    let mut trigger_lines = vec![format!(
+        "手动触发任务，触发人: {}，执行器地址: {}",
+        user.username, address
+    )];
+
+    match trigger_result {
+        Ok(result) => {
+            trigger_code = result.code;
+            if let Some(msg) = result.msg.filter(|m| !m.trim().is_empty()) {
+                trigger_lines.push(format!("执行器返回信息: {}", msg));
+            }
+            if let Some(content) = result.content.filter(|c| !c.trim().is_empty()) {
+                trigger_lines.push(format!("执行器返回内容: {}", content));
+            }
+        }
+        Err(err) => {
+            trigger_code = 500;
+            trigger_lines.push(format!("触发执行器失败: {}", err));
+        }
+    }
+
+    let trigger_msg = trigger_lines.join("<br>");
+
+    let update_log = job_log::ActiveModel {
+        id: Set(log_id),
+        trigger_code: Set(trigger_code),
+        trigger_msg: Set(Some(trigger_msg)),
+        ..Default::default()
+    };
+    job_log::Entity::update(update_log).exec(state.db()).await?;
 
     job.trigger_last_time = now.timestamp_millis();
     if let Some(next) = compute_next_trigger(&job)? {
@@ -374,6 +438,147 @@ async fn trigger_job(
     active.update(state.db()).await?;
 
     Ok(Json(json!({ "message": "触发成功" })))
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TriggerParamPayload {
+    job_id: i32,
+    executor_handler: String,
+    executor_params: String,
+    executor_block_strategy: String,
+    executor_timeout: i32,
+    log_id: i64,
+    log_date_time: i64,
+    glue_type: String,
+    glue_source: String,
+    glue_updatetime: i64,
+    broadcast_index: i32,
+    broadcast_total: i32,
+}
+
+fn build_trigger_param(
+    job: &job_info::Model,
+    log_id: i64,
+    log_time: i64,
+    handler: String,
+    executor_param: Option<String>,
+) -> TriggerParamPayload {
+    let executor_params = executor_param.unwrap_or_default();
+    let block_strategy = job
+        .executor_block_strategy
+        .clone()
+        .unwrap_or_else(|| "SERIAL_EXECUTION".to_string());
+    let glue_source = job.glue_source.clone().unwrap_or_default();
+    let glue_updatetime = job
+        .glue_updatetime
+        .map(|dt| Utc.from_utc_datetime(&dt).timestamp_millis())
+        .unwrap_or_default();
+
+    TriggerParamPayload {
+        job_id: job.id,
+        executor_handler: handler,
+        executor_params,
+        executor_block_strategy: block_strategy,
+        executor_timeout: job.executor_timeout,
+        log_id,
+        log_date_time: log_time,
+        glue_type: job.glue_type.clone(),
+        glue_source,
+        glue_updatetime,
+        broadcast_index: 0,
+        broadcast_total: 1,
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ExecutorReturn<T> {
+    code: i32,
+    msg: Option<T>,
+    content: Option<T>,
+}
+
+async fn trigger_executor(
+    client: &reqwest::Client,
+    raw_address: &str,
+    access_token: Option<&str>,
+    payload: &TriggerParamPayload,
+) -> anyhow::Result<ExecutorReturn<String>> {
+    let mut address = raw_address.trim().to_string();
+    if !address.ends_with('/') {
+        address.push('/');
+    }
+    address.push_str("run");
+
+    let mut request = client.post(address).json(payload);
+    if let Some(token) = access_token {
+        request = request.header("XXL-JOB-ACCESS-TOKEN", token);
+    }
+
+    let response = request.send().await?;
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "执行器返回非成功状态码: {}",
+            response.status()
+        ));
+    }
+
+    Ok(response.json::<ExecutorReturn<String>>().await?)
+}
+
+async fn resolve_executor_addresses(
+    state: &AppState,
+    group: &job_group::Model,
+    override_address: Option<&str>,
+) -> AppResult<Vec<String>> {
+    if let Some(list) = override_address.and_then(parse_address_list) {
+        if !list.is_empty() {
+            return Ok(list);
+        }
+    }
+
+    if group.address_type == 1 {
+        if let Some(list) = group.address_list.as_deref().and_then(parse_address_list) {
+            if !list.is_empty() {
+                return Ok(list);
+            }
+        }
+    }
+
+    let registries = job_registry::Entity::find()
+        .filter(job_registry::Column::RegistryGroup.eq("EXECUTOR"))
+        .filter(job_registry::Column::RegistryKey.eq(group.app_name.as_str()))
+        .all(state.db())
+        .await?;
+
+    let list: Vec<String> = registries
+        .into_iter()
+        .map(|item| item.registry_value)
+        .filter(|value| !value.trim().is_empty())
+        .collect();
+
+    if list.is_empty() {
+        return Err(AppError::BadRequest(
+            "未检测到可用的执行器实例，请确认执行器是否注册成功".into(),
+        ));
+    }
+
+    Ok(list)
+}
+
+fn parse_address_list(input: &str) -> Option<Vec<String>> {
+    let values: Vec<String> = input
+        .split([',', '\n'])
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
+        .collect();
+
+    if values.is_empty() {
+        None
+    } else {
+        Some(values)
+    }
 }
 
 #[derive(Debug, Deserialize)]
