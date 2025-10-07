@@ -39,5 +39,6 @@ fn build_router() -> Router<AppState> {
         .nest("/api/job-users", job_user::router())
         .nest("/api/job-code", glue::router())
         .nest("/api", openapi::router())
+        .nest("/joblog", job_logs::compat_router())
         .nest("/admin", admin::router())
 }
