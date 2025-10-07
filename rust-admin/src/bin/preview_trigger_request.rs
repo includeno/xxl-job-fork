@@ -193,7 +193,9 @@ async fn main() -> Result<()> {
             .build()
             .context("构建 HTTP 客户端失败")?;
 
-        let mut request = client.post(&config.url).header("Content-Type", "application/json");
+        let mut request = client
+            .post(&config.url)
+            .header("Content-Type", "application/json");
         if let Some(token) = config
             .token
             .as_deref()

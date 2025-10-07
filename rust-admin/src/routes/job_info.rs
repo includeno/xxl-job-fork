@@ -8,6 +8,10 @@ use axum::{
 };
 use chrono::{Duration, Local, LocalResult, TimeZone, Utc};
 use cron::Schedule;
+use reqwest::{
+    header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE},
+    Method,
+};
 use sea_orm::{query::*, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -645,6 +649,17 @@ async fn trigger_executor(
             format!("{:?}", payload)
         }
     };
+    let json_value: serde_json::Value = match serde_json::from_str(&request_body) {
+        Ok(value) => value,
+        Err(err) => {
+            warn!(
+                executor_address = raw_address,
+                error = %err,
+                "解析执行器触发请求体失败，继续使用结构体序列化结果"
+            );
+            serde_json::to_value(payload).unwrap_or(serde_json::Value::Null)
+        }
+    };
     let curl_preview = format_executor_request_curl(address.as_str(), access_token, &request_body);
     let pretty_body = to_pretty_json(payload).unwrap_or_else(|| request_body.clone());
 
@@ -654,15 +669,33 @@ async fn trigger_executor(
         request_body = %request_body,
         pretty_request_body = %pretty_body,
         curl = %curl_preview,
-        "发送执行器触发请求"
+        "发送执行器触发请求",
     );
 
-    let mut request = client.post(address).json(payload);
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     if let Some(token) = access_token {
-        request = request.header("XXL-JOB-ACCESS-TOKEN", token);
+        let token_value = HeaderValue::from_str(token)
+            .map_err(|err| anyhow::anyhow!("访问令牌包含非法字符，无法写入请求头: {err}"))?;
+        headers.insert(HeaderName::from_static("xxl-job-access-token"), token_value);
     }
 
-    let response = request.send().await.map_err(|err| {
+    let request_builder = client
+        .request(Method::POST, address.clone())
+        .headers(headers)
+        .json(&json_value);
+
+    if let Some(preview_builder) = request_builder.try_clone() {
+        if let Ok(preview_request) = preview_builder.build() {
+            info!(
+                executor_address = raw_address,
+                request_url = %preview_request.url(),
+                "执行器请求已构建"
+            );
+        }
+    }
+
+    let response = request_builder.send().await.map_err(|err| {
         if err.is_connect() {
             anyhow::anyhow!("无法连接到执行器，请确认网络和端口是否可达: {err}")
         } else if err.is_timeout() {
