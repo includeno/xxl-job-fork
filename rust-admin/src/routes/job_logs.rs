@@ -3,7 +3,8 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use chrono::{Duration, Local, NaiveDateTime};
+use chrono::{Duration, Local, LocalResult, NaiveDateTime, TimeZone, Utc};
+use reqwest::header::{HeaderName, HeaderValue, CONTENT_TYPE};
 use sea_orm::{query::*, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -159,22 +160,179 @@ async fn log_content(
         .one(state.db())
         .await?
         .ok_or_else(|| AppError::NotFound("日志不存在".into()))?;
-
-    let content = format!(
+    let summary_content = format!(
         "调度日志:\n{}\n执行日志:\n{}",
-        log.trigger_msg.unwrap_or_default(),
-        log.handle_msg.unwrap_or_default()
+        log.trigger_msg.clone().unwrap_or_default(),
+        log.handle_msg.clone().unwrap_or_default()
     );
+    let from = params.from_line_num.unwrap_or(1).max(1);
 
-    let from = params.from_line_num.unwrap_or(1);
-    let total_lines = content.lines().count() as i64;
+    fn build_summary(from: i64, summary: &str, reason: Option<String>) -> LogContentDto {
+        let mut content = summary.to_string();
+        if let Some(extra) = reason.and_then(|msg| {
+            let trimmed = msg.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }) {
+            if !content.ends_with('\n') {
+                content.push('\n');
+            }
+            content.push_str("\n提示: ");
+            content.push_str(&extra);
+        }
+        let total_lines = content.lines().count() as i64;
+        LogContentDto {
+            from_line_num: from,
+            to_line_num: total_lines,
+            end: true,
+            log_content: content,
+        }
+    }
 
-    Ok(Json(LogContentDto {
-        from_line_num: from,
-        to_line_num: total_lines,
-        end: true,
-        log_content: content,
-    }))
+    if log.trigger_code != 200 && log.handle_code == 0 {
+        return Ok(Json(build_summary(
+            from,
+            &summary_content,
+            Some("任务调度失败，执行日志不可用".into()),
+        )));
+    }
+
+    let executor_address = match log
+        .executor_address
+        .as_deref()
+        .map(str::trim)
+        .filter(|addr| !addr.is_empty())
+    {
+        Some(address) => address,
+        None => {
+            return Ok(Json(build_summary(
+                from,
+                &summary_content,
+                Some("执行器地址缺失，返回摘要日志".into()),
+            )))
+        }
+    };
+
+    let trigger_time = match log.trigger_time {
+        Some(time) => time,
+        None => {
+            return Ok(Json(build_summary(
+                from,
+                &summary_content,
+                Some("触发时间缺失，返回摘要日志".into()),
+            )))
+        }
+    };
+
+    let trigger_timestamp = match Local.from_local_datetime(&trigger_time) {
+        LocalResult::Single(value) => value.timestamp_millis(),
+        _ => Utc.from_utc_datetime(&trigger_time).timestamp_millis(),
+    };
+
+    #[derive(Serialize)]
+    struct ExecutorLogRequest {
+        #[serde(rename = "logId")]
+        log_id: i64,
+        #[serde(rename = "logDateTim")]
+        log_date_tim: i64,
+        #[serde(rename = "fromLineNum")]
+        from_line_num: i64,
+    }
+
+    let mut url = executor_address.to_string();
+    if !url.ends_with('/') {
+        url.push('/');
+    }
+    url.push_str("log");
+
+    let mut request = state
+        .http_client()
+        .post(&url)
+        .header(CONTENT_TYPE, "application/json")
+        .json(&ExecutorLogRequest {
+            log_id: log.id,
+            log_date_tim: trigger_timestamp,
+            from_line_num: from,
+        })
+        .timeout(state.settings().executor.timeout());
+
+    if let Some(token) = state.settings().executor.access_token() {
+        let header_value = HeaderValue::from_str(token)
+            .map_err(|err| AppError::BadRequest(format!("访问令牌格式非法: {err}")))?;
+        request = request.header(
+            HeaderName::from_static("xxl-job-access-token"),
+            header_value,
+        );
+    }
+
+    let response = match request.send().await {
+        Ok(resp) => resp,
+        Err(err) => {
+            let message = if err.is_timeout() {
+                format!("请求执行器超时: {err}")
+            } else if err.is_connect() {
+                format!("无法连接到执行器: {err}")
+            } else {
+                format!("调用执行器失败: {err}")
+            };
+            return Ok(Json(build_summary(from, &summary_content, Some(message))));
+        }
+    };
+
+    if !response.status().is_success() {
+        let message = format!("执行器返回状态码 {}", response.status());
+        return Ok(Json(build_summary(from, &summary_content, Some(message))));
+    }
+
+    #[derive(Deserialize)]
+    struct ExecutorLogResponse {
+        code: i32,
+        msg: Option<String>,
+        content: Option<ExecutorLogContent>,
+    }
+
+    #[derive(Deserialize)]
+    struct ExecutorLogContent {
+        #[serde(rename = "fromLineNum")]
+        from_line_num: i64,
+        #[serde(rename = "toLineNum")]
+        to_line_num: i64,
+        #[serde(rename = "logContent")]
+        log_content: String,
+        #[serde(rename = "isEnd")]
+        is_end: Option<bool>,
+    }
+
+    let payload = match response.json::<ExecutorLogResponse>().await {
+        Ok(body) => body,
+        Err(err) => {
+            let message = format!("解析执行器日志响应失败: {err}");
+            return Ok(Json(build_summary(from, &summary_content, Some(message))));
+        }
+    };
+
+    if payload.code != 200 {
+        let message = payload.msg.unwrap_or_else(|| "执行器返回失败".into());
+        return Ok(Json(build_summary(from, &summary_content, Some(message))));
+    }
+
+    if let Some(content) = payload.content {
+        return Ok(Json(LogContentDto {
+            from_line_num: content.from_line_num,
+            to_line_num: content.to_line_num,
+            end: content.is_end.unwrap_or(false),
+            log_content: content.log_content,
+        }));
+    }
+
+    Ok(Json(build_summary(
+        from,
+        &summary_content,
+        Some("执行器未返回日志内容".into()),
+    )))
 }
 
 #[derive(Debug, Deserialize)]
