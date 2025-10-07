@@ -361,7 +361,7 @@
                         </label>
                         <label>
                             子任务 ID
-                            <input id="job-child" name="childJobid" type="text" placeholder="多个以逗号分隔" />
+                            <input id="job-child" name="childJobId" type="text" placeholder="多个以逗号分隔" />
                         </label>
                     </div>
                 </section>
@@ -577,7 +577,7 @@
             executorFailRetryCount: numberValue(formData.get('executorFailRetryCount')),
             glueType: formData.get('glueType'),
             glueRemark: optionalValue(formData.get('glueRemark')),
-            childJobid: optionalValue(formData.get('childJobid')),
+            childJobId: optionalValue(formData.get('childJobId')),
         };
         try {
             if (jobEditingId) {
@@ -822,7 +822,7 @@
         jobForm.executorFailRetryCount.value = job.executorFailRetryCount ?? 0;
         jobForm.glueType.value = job.glueType || 'BEAN';
         jobForm.glueRemark.value = job.glueRemark || '';
-        jobForm.childJobid.value = job.childJobid || '';
+        jobForm.childJobId.value = job.childJobId || '';
         triggerPreviewList.textContent = '--';
         handleScheduleTypeChange();
     }
