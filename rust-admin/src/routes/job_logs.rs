@@ -57,6 +57,24 @@ struct PageResult<T> {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct LegacyPageResult<T> {
+    records_total: u64,
+    records_filtered: u64,
+    data: Vec<T>,
+}
+
+impl<T> From<PageResult<T>> for LegacyPageResult<T> {
+    fn from(value: PageResult<T>) -> Self {
+        Self {
+            records_total: value.records_total,
+            records_filtered: value.records_filtered,
+            data: value.data,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct JobLogDto {
     id: i64,
     job_group: i32,
@@ -258,15 +276,6 @@ async fn detail_impl(state: &AppState, id: i64) -> AppResult<JobLogDto> {
     Ok(JobLogDto::from(log))
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct LogContentDto {
-    from_line_num: i64,
-    to_line_num: i64,
-    end: bool,
-    log_content: String,
-}
-
 async fn log_content(
     State(state): State<AppState>,
     _user: AuthUser,
@@ -275,10 +284,10 @@ async fn log_content(
 ) -> AppResult<Json<LogContentDto>> {
     let from = params.from_line_num.unwrap_or(1).max(1);
     let content = log_content_impl(&state, id, from).await?;
-    Ok(Json(content))
+    Ok(Json(LogContentDto::from(content)))
 }
 
-async fn log_content_impl(state: &AppState, id: i64, from: i64) -> AppResult<LogContentDto> {
+async fn log_content_impl(state: &AppState, id: i64, from: i64) -> AppResult<LogContent> {
     let log = job_log::Entity::find_by_id(id)
         .one(state.db())
         .await?
@@ -418,7 +427,7 @@ async fn log_content_impl(state: &AppState, id: i64, from: i64) -> AppResult<Log
     }
 
     if let Some(content) = payload.content {
-        return Ok(LogContentDto {
+        return Ok(LogContent {
             from_line_num: content.from_line_num,
             to_line_num: content.to_line_num,
             end: content.is_end.unwrap_or(false),
@@ -433,7 +442,7 @@ async fn log_content_impl(state: &AppState, id: i64, from: i64) -> AppResult<Log
     ))
 }
 
-fn build_summary(from: i64, summary: &str, reason: Option<String>) -> LogContentDto {
+fn build_summary(from: i64, summary: &str, reason: Option<String>) -> LogContent {
     let mut content = summary.to_string();
     if let Some(extra) = reason.and_then(|msg| {
         let trimmed = msg.trim();
@@ -450,7 +459,7 @@ fn build_summary(from: i64, summary: &str, reason: Option<String>) -> LogContent
         content.push_str(&extra);
     }
     let total_lines = content.lines().count() as i64;
-    LogContentDto {
+    LogContent {
         from_line_num: from,
         to_line_num: total_lines,
         end: true,
@@ -462,6 +471,53 @@ fn build_summary(from: i64, summary: &str, reason: Option<String>) -> LogContent
 struct LogCatParams {
     #[serde(rename = "fromLineNum")]
     from_line_num: Option<i64>,
+}
+
+#[derive(Debug)]
+struct LogContent {
+    from_line_num: i64,
+    to_line_num: i64,
+    end: bool,
+    log_content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct LogContentDto {
+    from_line_num: i64,
+    to_line_num: i64,
+    end: bool,
+    log_content: String,
+}
+
+impl From<LogContent> for LogContentDto {
+    fn from(value: LogContent) -> Self {
+        Self {
+            from_line_num: value.from_line_num,
+            to_line_num: value.to_line_num,
+            end: value.end,
+            log_content: value.log_content,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyLogContentDto {
+    from_line_num: i64,
+    to_line_num: i64,
+    end: bool,
+    log_content: String,
+}
+
+impl From<LogContent> for LegacyLogContentDto {
+    fn from(value: LogContent) -> Self {
+        Self {
+            from_line_num: value.from_line_num,
+            to_line_num: value.to_line_num,
+            end: value.end,
+            log_content: value.log_content,
+        }
+    }
 }
 
 async fn kill(
@@ -673,9 +729,9 @@ async fn legacy_page_list(
     State(state): State<AppState>,
     _user: AuthUser,
     Form(params): Form<LegacyPageParams>,
-) -> AppResult<Json<PageResult<JobLogDto>>> {
+) -> AppResult<Json<LegacyPageResult<JobLogDto>>> {
     let result = page_list_impl(&state, params.into()).await?;
-    Ok(Json(result))
+    Ok(Json(result.into()))
 }
 
 async fn legacy_log_detail(
@@ -704,10 +760,12 @@ async fn legacy_log_detail_cat(
     State(state): State<AppState>,
     _user: AuthUser,
     Form(params): Form<LegacyLogDetailCatParams>,
-) -> Json<LegacyReturn<LogContentDto>> {
+) -> Json<LegacyReturn<LegacyLogContentDto>> {
     let from = params.from_line_num.unwrap_or(1).max(1);
     match log_content_impl(&state, params.log_id, from).await {
-        Ok(content) => Json(LegacyReturn::success_with(content)),
+        Ok(content) => Json(LegacyReturn::success_with(LegacyLogContentDto::from(
+            content,
+        ))),
         Err(err) => Json(LegacyReturn::failure(err.to_string())),
     }
 }
