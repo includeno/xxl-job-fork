@@ -20,9 +20,9 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(page_list))
-        .route("/{id}", get(detail))
-        .route("/{id}/cat", get(log_content))
-        .route("/{id}/kill", post(kill))
+        .route("/:id", get(detail))
+        .route("/:id/cat", get(log_content))
+        .route("/:id/kill", post(kill))
         .route("/clear", post(clear))
 }
 
