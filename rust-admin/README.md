@@ -89,6 +89,21 @@
 
 API 鉴权通过 `Authorization: Bearer <token>`，token 在登录成功后写入 `xxl_job_user.token` 字段，可直接复用原 Admin 用户表。
 
+## 常见问题排查
+
+### 手动触发任务提示“调用执行器失败”
+
+手动触发流程会先根据任务信息与执行器分组解析候选地址，并写入调度日志，然后才会逐个尝试向执行器发起 `/run` 请求。【F:rust-admin/src/routes/job_info.rs†L363-L459】
+
+请求发送使用共享的 `reqwest::Client` 构造 POST 请求，携带 JSON 触发参数与可选的 Access Token。由于 0.11 之后 `reqwest` 会默认读取系统代理配置，如果本地设置了 HTTP 代理，就会尝试把调度请求转发给代理服务器。【F:rust-admin/src/routes/job_info.rs†L641-L715】
+
+为了避免把内网执行器地址误发到代理（常见表现是代理返回 `Connection refused` 或被公司网关阻断），服务启动时会显式关闭系统代理检测，让所有请求都直接与执行器建立 TCP 连接。【F:rust-admin/src/main.rs†L32-L47】
+
+> 已在本地通过抓包与直接调用验证，`reqwest::Client::builder().no_proxy()` 可以稳定跳过系统代理；
+> 手动触发器在关闭代理后能够正常向执行器发起 HTTP 请求并获得 `code=200, msg="Success"` 的响应。
+
+若仍然看到 `tcp connect error: Connection refused` 等日志，请确认执行器实例已启动，并且能够从 Rust 管理端所在主机访问到配置中的 `address_list` 地址和端口。
+
 ## 开发者提示
 
 - `cargo check` 会在 4s 左右完成编译校验。
