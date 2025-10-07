@@ -562,22 +562,22 @@
         event.preventDefault();
         const formData = new FormData(jobForm);
         const payload = {
-            job_group: Number(formData.get('job_group')),
-            job_desc: formData.get('job_desc').trim(),
+            jobGroup: Number(formData.get('job_group')),
+            jobDesc: formData.get('job_desc').trim(),
             author: optionalValue(formData.get('author')),
-            alarm_email: optionalValue(formData.get('alarm_email')),
-            schedule_type: formData.get('schedule_type'),
-            schedule_conf: optionalValue(formData.get('schedule_conf')),
-            misfire_strategy: formData.get('misfire_strategy'),
-            executor_route_strategy: optionalValue(formData.get('executor_route_strategy')),
-            executor_handler: optionalValue(formData.get('executor_handler')),
-            executor_param: optionalValue(formData.get('executor_param')),
-            executor_block_strategy: optionalValue(formData.get('executor_block_strategy')),
-            executor_timeout: numberValue(formData.get('executor_timeout')),
-            executor_fail_retry_count: numberValue(formData.get('executor_fail_retry_count')),
-            glue_type: formData.get('glue_type'),
-            glue_remark: optionalValue(formData.get('glue_remark')),
-            child_jobid: optionalValue(formData.get('child_jobid')),
+            alarmEmail: optionalValue(formData.get('alarm_email')),
+            scheduleType: formData.get('schedule_type'),
+            scheduleConf: optionalValue(formData.get('schedule_conf')),
+            misfireStrategy: formData.get('misfire_strategy'),
+            executorRouteStrategy: optionalValue(formData.get('executor_route_strategy')),
+            executorHandler: optionalValue(formData.get('executor_handler')),
+            executorParam: optionalValue(formData.get('executor_param')),
+            executorBlockStrategy: optionalValue(formData.get('executor_block_strategy')),
+            executorTimeout: numberValue(formData.get('executor_timeout')),
+            executorFailRetryCount: numberValue(formData.get('executor_fail_retry_count')),
+            glueType: formData.get('glue_type'),
+            glueRemark: optionalValue(formData.get('glue_remark')),
+            childJobid: optionalValue(formData.get('child_jobid')),
         };
         try {
             if (jobEditingId) {
@@ -608,8 +608,8 @@
         }
         const formData = new FormData(triggerForm);
         const payload = {
-            executor_param: optionalValue(formData.get('executor_param')),
-            address_list: optionalValue(formData.get('address_list')),
+            executorParam: optionalValue(formData.get('executor_param')),
+            addressList: optionalValue(formData.get('address_list')),
         };
         try {
             await fetchJson(`${JOB_INFO_ENDPOINT}/${triggerTargetJobId}/trigger`, {
