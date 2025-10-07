@@ -37,6 +37,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct PageParams {
     start: Option<u64>,
     length: Option<u64>,

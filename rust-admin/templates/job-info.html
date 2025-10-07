@@ -272,11 +272,11 @@
                     <div class="form-grid">
                         <label>
                             执行器
-                            <select id="job-group" name="job_group" required></select>
+                            <select id="job-group" name="jobGroup" required></select>
                         </label>
                         <label>
                             任务描述
-                            <input id="job-desc" name="job_desc" type="text" required />
+                            <input id="job-desc" name="jobDesc" type="text" required />
                         </label>
                         <label>
                             负责人
@@ -284,7 +284,7 @@
                         </label>
                         <label>
                             报警邮箱
-                            <input id="job-email" name="alarm_email" type="email" placeholder="多个以逗号分隔" />
+                            <input id="job-email" name="alarmEmail" type="email" placeholder="多个以逗号分隔" />
                         </label>
                     </div>
                 </section>
@@ -293,7 +293,7 @@
                     <div class="form-grid">
                         <label>
                             调度类型
-                            <select id="job-schedule-type" name="schedule_type">
+                            <select id="job-schedule-type" name="scheduleType">
                                 <option value="CRON">CRON</option>
                                 <option value="FIX_RATE">固定频率 (秒)</option>
                                 <option value="FIX_DELAY">固定延迟 (秒)</option>
@@ -302,18 +302,18 @@
                         </label>
                         <label>
                             调度配置
-                            <input id="job-schedule-conf" name="schedule_conf" type="text" placeholder="CRON 表达式或秒数" />
+                            <input id="job-schedule-conf" name="scheduleConf" type="text" placeholder="CRON 表达式或秒数" />
                         </label>
                         <label>
                             错过策略
-                            <select id="job-misfire" name="misfire_strategy">
+                            <select id="job-misfire" name="misfireStrategy">
                                 <option value="DO_NOTHING">忽略</option>
                                 <option value="FIRE_ONCE_NOW">立即执行一次</option>
                             </select>
                         </label>
                         <label>
                             路由策略
-                            <select id="job-route" name="executor_route_strategy">
+                            <select id="job-route" name="executorRouteStrategy">
                                 <option value="FIRST">第一个</option>
                                 <option value="LAST">最后一个</option>
                                 <option value="ROUND">轮询</option>
@@ -328,7 +328,7 @@
                         </label>
                         <label>
                             阻塞策略
-                            <select id="job-block" name="executor_block_strategy">
+                            <select id="job-block" name="executorBlockStrategy">
                                 <option value="SERIAL_EXECUTION">单机串行</option>
                                 <option value="DISCARD_LATER">丢弃后续</option>
                                 <option value="COVER_EARLY">覆盖之前</option>
@@ -345,23 +345,23 @@
                     <div class="form-grid">
                         <label>
                             Handler
-                            <input id="job-handler" name="executor_handler" type="text" placeholder="示例：demoJobHandler" />
+                            <input id="job-handler" name="executorHandler" type="text" placeholder="示例：demoJobHandler" />
                         </label>
                         <label>
                             任务参数
-                            <textarea id="job-param" name="executor_param" placeholder="JSON 或文本"></textarea>
+                            <textarea id="job-param" name="executorParam" placeholder="JSON 或文本"></textarea>
                         </label>
                         <label>
                             超时时间 (秒)
-                            <input id="job-timeout" name="executor_timeout" type="number" min="0" value="0" />
+                            <input id="job-timeout" name="executorTimeout" type="number" min="0" value="0" />
                         </label>
                         <label>
                             失败重试次数
-                            <input id="job-retry" name="executor_fail_retry_count" type="number" min="0" value="0" />
+                            <input id="job-retry" name="executorFailRetryCount" type="number" min="0" value="0" />
                         </label>
                         <label>
                             子任务 ID
-                            <input id="job-child" name="child_jobid" type="text" placeholder="多个以逗号分隔" />
+                            <input id="job-child" name="childJobid" type="text" placeholder="多个以逗号分隔" />
                         </label>
                     </div>
                 </section>
@@ -370,7 +370,7 @@
                     <div class="form-grid">
                         <label>
                             Glue 类型
-                            <select id="job-glue" name="glue_type">
+                            <select id="job-glue" name="glueType">
                                 <option value="BEAN">BEAN</option>
                                 <option value="GLUE_GROOVY">GLUE Groovy</option>
                                 <option value="GLUE_SHELL">GLUE Shell</option>
@@ -382,7 +382,7 @@
                         </label>
                         <label>
                             Glue 备注
-                            <input id="job-glue-remark" name="glue_remark" type="text" placeholder="可选" />
+                            <input id="job-glue-remark" name="glueRemark" type="text" placeholder="可选" />
                         </label>
                     </div>
                 </section>
@@ -406,11 +406,11 @@
             <div class="modal-body form-grid">
                 <label>
                     执行参数
-                    <textarea id="trigger-param" name="executor_param" placeholder="可选"></textarea>
+                    <textarea id="trigger-param" name="executorParam" placeholder="可选"></textarea>
                 </label>
                 <label>
                     执行地址
-                    <input id="trigger-address" name="address_list" type="text" placeholder="留空表示自动选择" />
+                    <input id="trigger-address" name="addressList" type="text" placeholder="留空表示自动选择" />
                 </label>
             </div>
             <div class="modal-footer">
@@ -456,10 +456,10 @@
     const triggerForm = document.getElementById("trigger-form");
 
     const jobFilters = {
-        job_group: "",
-        trigger_status: "",
-        job_desc: "",
-        executor_handler: "",
+        jobGroup: "",
+        triggerStatus: "",
+        jobDesc: "",
+        executorHandler: "",
         author: "",
         start: 0,
         length: 10,
@@ -499,8 +499,8 @@
         jobForm.reset();
         triggerPreviewList.textContent = '--';
         jobModalTitle.textContent = '新增任务';
-        if (jobFilters.job_group) {
-            jobModalGroupSelect.value = jobFilters.job_group;
+        if (jobFilters.jobGroup) {
+            jobModalGroupSelect.value = jobFilters.jobGroup;
         }
         handleScheduleTypeChange();
         openModal(jobModal);
@@ -562,22 +562,22 @@
         event.preventDefault();
         const formData = new FormData(jobForm);
         const payload = {
-            jobGroup: Number(formData.get('job_group')),
-            jobDesc: formData.get('job_desc').trim(),
+            jobGroup: Number(formData.get('jobGroup')),
+            jobDesc: formData.get('jobDesc').trim(),
             author: optionalValue(formData.get('author')),
-            alarmEmail: optionalValue(formData.get('alarm_email')),
-            scheduleType: formData.get('schedule_type'),
-            scheduleConf: optionalValue(formData.get('schedule_conf')),
-            misfireStrategy: formData.get('misfire_strategy'),
-            executorRouteStrategy: optionalValue(formData.get('executor_route_strategy')),
-            executorHandler: optionalValue(formData.get('executor_handler')),
-            executorParam: optionalValue(formData.get('executor_param')),
-            executorBlockStrategy: optionalValue(formData.get('executor_block_strategy')),
-            executorTimeout: numberValue(formData.get('executor_timeout')),
-            executorFailRetryCount: numberValue(formData.get('executor_fail_retry_count')),
-            glueType: formData.get('glue_type'),
-            glueRemark: optionalValue(formData.get('glue_remark')),
-            childJobid: optionalValue(formData.get('child_jobid')),
+            alarmEmail: optionalValue(formData.get('alarmEmail')),
+            scheduleType: formData.get('scheduleType'),
+            scheduleConf: optionalValue(formData.get('scheduleConf')),
+            misfireStrategy: formData.get('misfireStrategy'),
+            executorRouteStrategy: optionalValue(formData.get('executorRouteStrategy')),
+            executorHandler: optionalValue(formData.get('executorHandler')),
+            executorParam: optionalValue(formData.get('executorParam')),
+            executorBlockStrategy: optionalValue(formData.get('executorBlockStrategy')),
+            executorTimeout: numberValue(formData.get('executorTimeout')),
+            executorFailRetryCount: numberValue(formData.get('executorFailRetryCount')),
+            glueType: formData.get('glueType'),
+            glueRemark: optionalValue(formData.get('glueRemark')),
+            childJobid: optionalValue(formData.get('childJobid')),
         };
         try {
             if (jobEditingId) {
@@ -608,8 +608,8 @@
         }
         const formData = new FormData(triggerForm);
         const payload = {
-            executorParam: optionalValue(formData.get('executor_param')),
-            addressList: optionalValue(formData.get('address_list')),
+            executorParam: optionalValue(formData.get('executorParam')),
+            addressList: optionalValue(formData.get('addressList')),
         };
         try {
             await fetchJson(`${JOB_INFO_ENDPOINT}/${triggerTargetJobId}/trigger`, {
@@ -679,7 +679,7 @@
 
     refreshGroupOptions().then(() => {
         syncFilters();
-        if (jobFilters.job_group) {
+        if (jobFilters.jobGroup) {
             loadJobs(true);
         } else {
             jobTableBody.innerHTML = '<tr><td colspan="8" class="muted">请先创建执行器</td></tr>';
@@ -687,10 +687,10 @@
     });
 
     function syncFilters() {
-        jobFilters.job_group = jobGroupSelect.value;
-        jobFilters.trigger_status = document.getElementById('job-filter-status').value;
-        jobFilters.job_desc = document.getElementById('job-filter-desc').value.trim();
-        jobFilters.executor_handler = document.getElementById('job-filter-handler').value.trim();
+        jobFilters.jobGroup = jobGroupSelect.value;
+        jobFilters.triggerStatus = document.getElementById('job-filter-status').value;
+        jobFilters.jobDesc = document.getElementById('job-filter-desc').value.trim();
+        jobFilters.executorHandler = document.getElementById('job-filter-handler').value.trim();
         jobFilters.author = document.getElementById('job-filter-author').value.trim();
         jobFilters.start = 0;
     }
@@ -730,12 +730,12 @@
             }
         });
         if (jobGroupSelect) {
-            jobFilters.job_group = jobGroupSelect.value;
+            jobFilters.jobGroup = jobGroupSelect.value;
         }
     }
 
     async function loadJobs(resetStart = false) {
-        if (!jobFilters.job_group) {
+        if (!jobFilters.jobGroup) {
             jobTableBody.innerHTML = '<tr><td colspan="8" class="muted">请选择执行器</td></tr>';
             jobTotalEl.textContent = '0';
             jobTotalEl.dataset.total = '0';
@@ -747,16 +747,16 @@
         const params = new URLSearchParams({
             start: String(jobFilters.start),
             length: String(jobFilters.length),
-            job_group: jobFilters.job_group,
+            jobGroup: jobFilters.jobGroup,
         });
-        if (jobFilters.trigger_status) {
-            params.set('trigger_status', jobFilters.trigger_status);
+        if (jobFilters.triggerStatus) {
+            params.set('triggerStatus', jobFilters.triggerStatus);
         }
-        if (jobFilters.job_desc) {
-            params.set('job_desc', jobFilters.job_desc);
+        if (jobFilters.jobDesc) {
+            params.set('jobDesc', jobFilters.jobDesc);
         }
-        if (jobFilters.executor_handler) {
-            params.set('executor_handler', jobFilters.executor_handler);
+        if (jobFilters.executorHandler) {
+            params.set('executorHandler', jobFilters.executorHandler);
         }
         if (jobFilters.author) {
             params.set('author', jobFilters.author);
@@ -807,22 +807,22 @@
     }
 
     function fillJobForm(job) {
-        jobForm.job_group.value = job.jobGroup;
-        jobForm.job_desc.value = job.jobDesc || '';
+        jobForm.jobGroup.value = job.jobGroup;
+        jobForm.jobDesc.value = job.jobDesc || '';
         jobForm.author.value = job.author || '';
-        jobForm.alarm_email.value = job.alarmEmail || '';
-        jobForm.schedule_type.value = job.scheduleType || 'CRON';
-        jobForm.schedule_conf.value = job.scheduleConf || '';
-        jobForm.misfire_strategy.value = job.misfireStrategy || 'DO_NOTHING';
-        jobForm.executor_route_strategy.value = job.executorRouteStrategy || 'FIRST';
-        jobForm.executor_handler.value = job.executorHandler || '';
-        jobForm.executor_param.value = job.executorParam || '';
-        jobForm.executor_block_strategy.value = job.executorBlockStrategy || 'SERIAL_EXECUTION';
-        jobForm.executor_timeout.value = job.executorTimeout ?? 0;
-        jobForm.executor_fail_retry_count.value = job.executorFailRetryCount ?? 0;
-        jobForm.glue_type.value = job.glueType || 'BEAN';
-        jobForm.glue_remark.value = job.glueRemark || '';
-        jobForm.child_jobid.value = job.childJobid || '';
+        jobForm.alarmEmail.value = job.alarmEmail || '';
+        jobForm.scheduleType.value = job.scheduleType || 'CRON';
+        jobForm.scheduleConf.value = job.scheduleConf || '';
+        jobForm.misfireStrategy.value = job.misfireStrategy || 'DO_NOTHING';
+        jobForm.executorRouteStrategy.value = job.executorRouteStrategy || 'FIRST';
+        jobForm.executorHandler.value = job.executorHandler || '';
+        jobForm.executorParam.value = job.executorParam || '';
+        jobForm.executorBlockStrategy.value = job.executorBlockStrategy || 'SERIAL_EXECUTION';
+        jobForm.executorTimeout.value = job.executorTimeout ?? 0;
+        jobForm.executorFailRetryCount.value = job.executorFailRetryCount ?? 0;
+        jobForm.glueType.value = job.glueType || 'BEAN';
+        jobForm.glueRemark.value = job.glueRemark || '';
+        jobForm.childJobid.value = job.childJobid || '';
         triggerPreviewList.textContent = '--';
         handleScheduleTypeChange();
     }
