@@ -1,5 +1,5 @@
 use axum::{extract::State, routing::post, Json, Router};
-use chrono::Utc;
+use chrono::Local;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
@@ -66,7 +66,7 @@ async fn save_registry(state: &AppState, payload: RegistryRequest) -> Result<(),
         return Err("registryGroup/registryKey/registryValue 不能为空".into());
     }
 
-    let now = Utc::now().naive_utc();
+    let now = Local::now().naive_local();
     let existing = job_registry::Entity::find()
         .filter(job_registry::Column::RegistryGroup.eq(group))
         .filter(job_registry::Column::RegistryKey.eq(key))
@@ -179,7 +179,7 @@ async fn process_callback(state: &AppState, param: HandleCallbackParam) -> Resul
         combined_msg.push_str(msg.trim());
     }
 
-    model.handle_time = Some(Utc::now().naive_utc());
+    model.handle_time = Some(Local::now().naive_local());
     model.handle_code = param.handle_code;
     model.handle_msg = if combined_msg.is_empty() {
         None
