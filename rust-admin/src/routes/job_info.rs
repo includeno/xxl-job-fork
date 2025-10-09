@@ -37,6 +37,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct PageParams {
     start: Option<u64>,
     length: Option<u64>,
@@ -75,6 +76,7 @@ struct JobInfoDto {
     glue_source: Option<String>,
     glue_remark: Option<String>,
     glue_updatetime: Option<chrono::NaiveDateTime>,
+    #[serde(rename = "childJobId")]
     child_jobid: Option<String>,
     trigger_status: i8,
     trigger_last_time: i64,
@@ -134,6 +136,7 @@ struct SaveJobInfoRequest {
     glue_type: String,
     glue_source: Option<String>,
     glue_remark: Option<String>,
+    #[serde(rename = "childJobId", alias = "childJobid")]
     child_jobid: Option<String>,
 }
 
